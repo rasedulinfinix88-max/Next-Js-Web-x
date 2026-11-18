@@ -1,4 +1,4 @@
 [functions.auth-manager]
 enabled = true
 verify_jwt = false
-entrypoint = "./functions/auth-manager/handler.ts"
+entrypoint = "./functions/auth-manager/index.ts"
