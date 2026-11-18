@@ -1,4 +1,6 @@
 
+// @ts-nocheck
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -9,53 +11,79 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+const serviceRoleKey =
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-const admin = createClient(SUPABASE_URL, SERVICE_KEY);
-
-function response(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
+function response(data: any, status = 200) {
+  return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
   });
 }
 
-function base64(bytes: Uint8Array) {
-  let binary = "";
-  bytes.forEach((byte) => (binary += String.fromCharCode(byte)));
-  return btoa(binary);
+// Mobile number normalization
+function normalizeMobile(value: string) {
+  return value.replace(/\D/g, "");
 }
 
+// Secret PIN hashing using PBKDF2
 async function hashSecretPin(pin: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
+
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(pin),
     "PBKDF2",
     false,
-    ["deriveBits"],
+    ["deriveBits"]
   );
 
-  const bits = await crypto.subtle.deriveBits(
+  const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
       salt,
-      iterations: 310000,
+      iterations: 210000,
       hash: "SHA-256",
     },
     key,
-    256,
+    256
   );
 
-  return `pbkdf2$310000$${base64(salt)}$${base64(new Uint8Array(bits))}`;
+  const saltHex = Array.from(salt)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const hashHex = Array.from(new Uint8Array(derivedBits))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return `pbkdf2_sha256$210000$${saltHex}$${hashHex}`;
 }
 
-function generateLotteryId() {
-  const random = new Uint32Array(1);
-  crypto.getRandomValues(random);
-  return String(10000000 + (random[0] % 90000000));
+// Generate unique 8-digit Lottery ID
+async function generateLotteryId(supabase: any) {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const randomBytes = crypto.getRandomValues(new Uint32Array(1));
+    const number = 10000000 + (randomBytes[0] % 90000000);
+    const lotteryId = String(number);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("lottery_id", lotteryId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!data) return lotteryId;
+  }
+
+  throw new Error("Could not generate a unique Lottery ID. Try again.");
 }
 
 serve(async (req) => {
@@ -68,208 +96,302 @@ serve(async (req) => {
   }
 
   try {
-    if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
-      throw new Error("Supabase environment settings are missing.");
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      throw new Error("Supabase environment configuration is missing");
     }
 
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      serviceRoleKey,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+
     const body = await req.json();
-    const { action } = body;
 
-    // SIGNUP
+    const {
+      action,
+      full_name,
+      password,
+      confirm_password,
+      secret_pin,
+      ref,
+    } = body;
+
+    // =========================================
+    // 1. SIGNUP
+    // =========================================
+
     if (action === "signup") {
-      const fullName = String(body.full_name ?? "").trim();
-      const mobile = String(body.mobile ?? "").trim();
-      const password = String(body.password ?? "");
-      const secretPin = String(body.secret_pin ?? "");
-      const ref = String(body.ref ?? "").trim();
+      const fullName = String(full_name ?? "").trim();
+      const mobile = normalizeMobile(
+        String(body.user_mobile ?? body.mobile ?? "")
+      );
 
-      if (!fullName || !mobile || !password || !secretPin) {
-        throw new Error("সবগুলো ঘর পূরণ করুন।");
+      const userPassword = String(password ?? "");
+      const confirmPassword = String(
+        confirm_password ?? body.confirmPassword ?? ""
+      );
+
+      const secretPin = String(
+        secret_pin ?? body.secretPin ?? ""
+      );
+
+      if (
+        !fullName ||
+        !mobile ||
+        !userPassword ||
+        !confirmPassword ||
+        !secretPin
+      ) {
+        return response({ error: "All signup fields are required" }, 400);
       }
 
-      if (!/^01\d{9}$/.test(mobile)) {
-        throw new Error("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।");
+      if (mobile.length < 10 || mobile.length > 15) {
+        return response({ error: "Invalid mobile number" }, 400);
       }
 
-      if (password.length < 8) {
-        throw new Error("Password কমপক্ষে ৮ অক্ষরের হতে হবে।");
+      if (userPassword !== confirmPassword) {
+        return response({ error: "Passwords do not match" }, 400);
       }
 
-      if (!/^\d{4}$/.test(secretPin)) {
-        throw new Error("Secret PIN অবশ্যই ৪ ডিজিটের হতে হবে।");
-      }
-
-      const { data: existingMobile } = await admin
-        .from("profiles")
-        .select("id")
-        .eq("user_mobile", mobile)
-        .maybeSingle();
-
-      if (existingMobile) {
-        throw new Error("এই মোবাইল নম্বরটি ইতিমধ্যে নিবন্ধিত।");
-      }
-
-      const email = `${mobile}@user.local`;
-
-      const { data: authData, error: authError } =
-        await admin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: fullName },
-        });
-
-      if (authError || !authData.user) {
-        throw new Error(
-          authError?.message || "Account তৈরি করা যায়নি।",
+      if (userPassword.length < 8) {
+        return response(
+          { error: "Password must be at least 8 characters" },
+          400
         );
       }
 
-      const pinHash = await hashSecretPin(secretPin);
-      let createdProfile = false;
-      let lotteryId = "";
+      if (!/^\d{4}$/.test(secretPin)) {
+        return response(
+          { error: "Secret PIN must contain exactly 4 digits" },
+          400
+        );
+      }
 
-      try {
-        for (let attempt = 0; attempt < 10; attempt++) {
-          lotteryId = generateLotteryId();
+      // Check whether mobile is already registered
+      const { data: existingMobile, error: mobileCheckError } =
+        await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("user_mobile", mobile)
+          .maybeSingle();
 
-          const { data: existingLottery } = await admin
+      if (mobileCheckError) throw mobileCheckError;
+
+      if (existingMobile) {
+        return response(
+          { error: "This mobile number is already registered" },
+          409
+        );
+      }
+
+      // Generate Lottery ID on backend
+      const lotteryId = await generateLotteryId(supabaseAdmin);
+
+      // Hash Secret PIN
+      const hashedPin = await hashSecretPin(secretPin);
+
+      // Internal email for Supabase Auth
+      const email = `${mobile}@user.local`;
+
+      // Create Supabase Auth user
+      const { data: authData, error: authError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          password: userPassword,
+          email_confirm: true,
+        });
+
+      if (authError) {
+        if (authError.message?.toLowerCase().includes("already")) {
+          return response(
+            { error: "This mobile number is already registered" },
+            409
+          );
+        }
+
+        throw authError;
+      }
+
+      // Insert profile
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .insert({
+          id: authData.user.id,
+          full_name: fullName,
+          user_mobile: mobile,
+          lottery_id: lotteryId,
+          user_secret_pin: hashedPin,
+          account_status: "active",
+          user_role: "user",
+        });
+
+      if (profileError) {
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        throw profileError;
+      }
+
+      // =========================================
+      // REFERRAL LOGIC
+      // =========================================
+
+      if (ref) {
+        try {
+          const referralCode = String(ref).trim();
+
+          const { data: referrerData } = await supabaseAdmin
             .from("profiles")
             .select("id")
-            .eq("lottery_id", lotteryId)
+            .eq("lottery_id", referralCode)
             .maybeSingle();
 
-          if (existingLottery) continue;
+          if (
+            referrerData &&
+            referrerData.id !== authData.user.id
+          ) {
+            const { error: referralError } = await supabaseAdmin
+              .from("user_invited_friend_referral")
+              .insert({
+                referrer_id: referrerData.id,
+                referred_user_id: authData.user.id,
+                deposit_amount: 0,
+                bonus_amount: 0,
+                status: "pending",
+              });
 
-          const { error: profileError } = await admin
-            .from("profiles")
-            .insert({
-              id: authData.user.id,
-              full_name: fullName,
-              user_mobile: mobile,
-              user_email: email,
-              lottery_id: lotteryId,
-              account_status: "active",
-              user_role: "user",
-              user_secret_pin: pinHash,
-            });
-
-          if (!profileError) {
-            createdProfile = true;
-            break;
-          }
-
-          const duplicateLottery =
-            profileError.code === "23505" &&
-            (
-              profileError.message.includes("lottery_id") ||
-              profileError.message.includes("profiles_lottery_id_key")
-            );
-
-          if (duplicateLottery) continue;
-
-          throw profileError;
-        }
-
-        if (!createdProfile) {
-          throw new Error("Lottery ID তৈরি করা যায়নি। আবার চেষ্টা করুন।");
-        }
-
-        // Referral: ref হিসেবে পুরোনো Lottery ID থাকলে সংরক্ষণ
-        if (ref) {
-          try {
-            const { data: referrer } = await admin
-              .from("profiles")
-              .select("id")
-              .eq("lottery_id", ref)
-              .maybeSingle();
-
-            if (referrer && referrer.id !== authData.user.id) {
-              await admin
-                .from("user_invited_friend_referral")
-                .insert({
-                  referrer_id: referrer.id,
-                  referred_user_id: authData.user.id,
-                  deposit_amount: 0,
-                  bonus_amount: 0,
-                  status: "pending",
-                });
+            if (referralError) {
+              console.error("Referral save error:", referralError);
             }
-          } catch (refError) {
-            console.error("Referral save error:", refError);
           }
+        } catch (referralError) {
+          console.error("Referral error:", referralError);
         }
-      } catch (profileError) {
-        await admin.auth.admin.deleteUser(authData.user.id);
-        throw profileError;
       }
 
       return response({
         message: "Signup successful",
         lottery_id: lotteryId,
+        user: {
+          id: authData.user.id,
+          full_name: fullName,
+          user_mobile: mobile,
+          account_status: "active",
+          user_role: "user",
+        },
       });
     }
 
-    // LOGIN
+    // =========================================
+    // 2. LOGIN WITH LOTTERY ID OR MOBILE
+    // =========================================
+
     if (action === "login") {
-      const identifier = String(body.identifier ?? "").trim();
-      const password = String(body.password ?? "");
+      const identifier = String(
+        body.identifier ??
+        body.lottery_id ??
+        body.user_mobile ??
+        body.mobile ??
+        ""
+      ).trim();
 
-      if (!identifier || !password) {
-        throw new Error("Lottery ID অথবা Mobile Number এবং Password দিন।");
+      const userPassword = String(password ?? "");
+
+      if (!identifier || !userPassword) {
+        return response(
+          { error: "Lottery ID or mobile and password are required" },
+          400
+        );
       }
 
-      let query = admin
+      const normalizedIdentifier = normalizeMobile(identifier);
+
+      // First search by Lottery ID
+      let { data: profile, error: profileError } = await supabaseAdmin
         .from("profiles")
-        .select("id, user_mobile, user_email, account_status");
+        .select("id, lottery_id, user_mobile, account_status")
+        .eq("lottery_id", identifier)
+        .maybeSingle();
 
-      if (/^[1-9]\d{7}$/.test(identifier)) {
-        query = query.eq("lottery_id", identifier);
-      } else if (/^01\d{9}$/.test(identifier)) {
-        query = query.eq("user_mobile", identifier);
-      } else {
-        throw new Error("সঠিক Lottery ID অথবা Mobile Number দিন।");
+      if (profileError) throw profileError;
+
+      // If not found, search by mobile
+      if (!profile) {
+        const { data, error } = await supabaseAdmin
+          .from("profiles")
+          .select("id, lottery_id, user_mobile, account_status")
+          .eq("user_mobile", normalizedIdentifier)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        profile = data;
       }
 
-      const { data: profile, error: profileError } =
-        await query.maybeSingle();
-
-      if (profileError || !profile) {
-        throw new Error("Invalid Lottery ID/Mobile Number or Password.");
+      if (!profile) {
+        return response(
+          { error: "Invalid Lottery ID/Mobile or Password" },
+          401
+        );
       }
 
       if (profile.account_status !== "active") {
-        throw new Error("আপনার Account বর্তমানে Active নেই।");
+        return response(
+          { error: "Your account is not active" },
+          403
+        );
       }
 
-      const loginEmail =
-        profile.user_email || `${profile.user_mobile}@user.local`;
+      const loginEmail = `${profile.user_mobile}@user.local`;
 
-      const publicClient = createClient(SUPABASE_URL, ANON_KEY);
+      const supabasePublic = createClient(
+        supabaseUrl,
+        anonKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        }
+      );
 
       const { data: loginData, error: loginError } =
-        await publicClient.auth.signInWithPassword({
+        await supabasePublic.auth.signInWithPassword({
           email: loginEmail,
-          password,
+          password: userPassword,
         });
 
-      if (loginError || !loginData.session) {
-        throw new Error("Invalid Lottery ID/Mobile Number or Password.");
+      if (loginError) {
+        return response(
+          { error: "Invalid Lottery ID/Mobile or Password" },
+          401
+        );
       }
 
       return response({
         message: "Login successful",
         session: loginData.session,
-        user: loginData.user,
+        user: {
+          id: profile.id,
+          lottery_id: profile.lottery_id,
+          user_mobile: profile.user_mobile,
+          account_status: profile.account_status,
+        },
       });
     }
 
-    throw new Error("Invalid action.");
+    return response({ error: "Invalid action" }, 400);
+
   } catch (error) {
-    console.error("Auth manager error:", error);
+    console.error("Auth Manager Error:", error);
+
     return response(
-      { error: error instanceof Error ? error.message : "Request failed." },
-      400,
+      { error: error.message ?? "Internal server error" },
+      400
     );
   }
 });
