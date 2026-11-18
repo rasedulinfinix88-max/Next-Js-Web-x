@@ -94,7 +94,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setIsMenuOpen(false);
-    router.push("/Client/Login");
+    router.push("/Next-Js-Web-x/Client/Login/");
   };
 
   return (
@@ -112,7 +112,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <button
-              onClick={() => router.push("/Notification")}
+              onClick={() => router.push("/Next-Js-Web-x/Notification")}
               className="relative p-1.5 rounded-full bg-black/20 hover:bg-black/40 transition border border-white/10"
             >
               <Icons.Bell />
@@ -123,14 +123,14 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
           ) : (
             <div className="flex items-center gap-2">
               <Link
-                href="/Client/Login?redirect=/"
+                href="/Next-Js-Web-x/Client/Login/"
                 className="border border-white text-white px-3 py-1.5 rounded-full text-[11px] font-bold hover:bg-white/10 transition"
               >
                 {t("Login", "লগইন")}
               </Link>
 
               <Link
-                href="/Client/Sign-up?redirect=/"
+                href="/Next-Js-Web-x/Client/Sign-up/"
                 className="bg-white text-black px-3 py-1.5 rounded-full text-[11px] font-bold hover:opacity-90 transition"
               >
                 {t("Signup", "সাইনআপ")}
@@ -158,11 +158,10 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
             className="absolute top-[64px] right-3 mt-1 w-64 bg-[#184f35] border border-[#26352e] rounded-xl shadow-2xl overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Reload Balance */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Lottery/Secure-payment");
+                router.push("/Next-Js-Web-x/Lottery/Secure-payment");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
@@ -174,11 +173,10 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
 
             {isLoggedIn && (
               <>
-                {/* Withdraw Fund */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/withdraw-terms");
+                    router.push("/Next-Js-Web-x/Lottery/withdraw-terms");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -188,11 +186,10 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                   </span>
                 </button>
 
-                {/* Winner */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/winners");
+                    router.push("/Next-Js-Web-x/Lottery/winners");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -202,11 +199,10 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                   </span>
                 </button>
 
-                {/* Transactions */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/Transactions-activity");
+                    router.push("/Next-Js-Web-x/Lottery/Transactions-activity");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -218,11 +214,10 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
               </>
             )}
 
-            {/* Terms Condition */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Lottery/withdraw-terms");
+                router.push("/Next-Js-Web-x/Lottery/withdraw-terms");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
@@ -232,7 +227,6 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
               </span>
             </button>
 
-            {/* Language Selector */}
             <div className="px-4 py-2 flex flex-col gap-2 border-b border-[#26352e]">
               <span className="text-[11px] text-white/70 font-semibold flex items-center gap-2">
                 <Icons.Globe />
@@ -264,7 +258,6 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
               </div>
             </div>
 
-            {/* Logout */}
             {isLoggedIn && (
               <button
                 onClick={handleLogout}
@@ -282,4 +275,3 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
     </>
   );
 }
-
