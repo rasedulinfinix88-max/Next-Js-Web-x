@@ -69,6 +69,12 @@ function SignupForm() {
       return;
     }
 
+    if (!formData.confirmPassword) {
+      setError("Confirm Password দিতে হবে।");
+      setLoading(false);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match.");
       setLoading(false);
@@ -89,6 +95,7 @@ function SignupForm() {
             full_name: formData.full_name.trim(),
             mobile: formData.mobile,
             password: formData.password,
+            confirm_password: formData.confirmPassword,
             secret_pin: formData.secret_pin,
             ref: refCode,
           },
@@ -220,14 +227,14 @@ function SignupForm() {
               }}
             >
               <svg className="w-4 h-4 mr-2" style={{ color: "#A0ADB0" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a2 2 0 01.948.684l1.498 4.493a2 2 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a2 2 0 011.21-.502l4.493 1.498a2 2 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
               <input
                 type="tel"
                 name="mobile"
                 value={formData.mobile}
                 onChange={handleChange}
-                placeholder="Mobile Number (01XXXXXXXXX)"
+                placeholder="01"
                 maxLength={11}
                 required
                 className="w-full bg-transparent border-none outline-none text-white text-sm"
@@ -325,7 +332,7 @@ function SignupForm() {
                 name="secret_pin"
                 value={formData.secret_pin}
                 onChange={handleChange}
-                placeholder="Enter 4 Digit Secret PIN"
+                placeholder="4 Digit Secret PIN"
                 inputMode="numeric"
                 maxLength={4}
                 required
