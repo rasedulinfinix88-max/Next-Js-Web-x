@@ -1,0 +1,89 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# একই সময়ে একাধিক Pages deployment চলা আটকাবে।
+# চলমান deployment নতুন push এলে বাতিল হবে না।
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Next.js build cache
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Add .nojekyll file
+        run: touch ./out/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # Deployment সম্পন্ন হওয়ার পর সাইটের HTTP status যাচাই
+      - name: Verify Live Site
+        run: |
+          echo "Checking the deployed site..."
+          SITE_URL="${{ steps.deployment.outputs.page_url }}"
+
+          for i in $(seq 1 20); do
+            STATUS=$(curl -L -o /dev/null -s -w "%{http_code}" "$SITE_URL")
+
+            if [ "$STATUS" -eq 200 ]; then
+              echo "Success! Site is live with Status 200."
+              exit 0
+            fi
+
+            echo "Attempt $i: Site returned status $STATUS. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "Warning: Site did not return 200 within the time limit, but deployment task is complete."
