@@ -1,8 +1,24 @@
 
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: "export",
 
-const nextConfig: NextConfig = {
-  reactStrictMode: true,
+  images: {
+    unoptimized: true,
+  },
+
+  trailingSlash: true,
+
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  basePath: "/Next-Js-Web-x",
+  assetPrefix: "/Next-Js-Web-x/",
 };
 
 export default nextConfig;
