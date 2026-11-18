@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import { checkAdminAccess } from "../../../lib/admin/admin-auth";
+import AdminMenu from "../../../components/admin/AdminMenu";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -70,30 +71,25 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#07110d] text-white">
-
       <header className="border-b border-[#24543b] bg-[#10251a] px-4 py-4">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-green-400">
-              Admin Panel
+              GAZICASINO ADMIN
             </h1>
             <p className="mt-1 text-xs text-gray-400">
               Secure Administration Dashboard
             </p>
           </div>
 
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
-          >
-            {loggingOut ? "Logging out..." : "Logout"}
-          </button>
+          <AdminMenu
+            onLogout={handleLogout}
+            loggingOut={loggingOut}
+          />
         </div>
       </header>
 
       <section className="mx-auto max-w-7xl px-4 py-8">
-
         <div className="rounded-2xl border border-[#24543b] bg-[#10251a] p-6">
           <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#184f35] text-3xl">
             👑
@@ -119,7 +115,6 @@ export default function AdminDashboardPage() {
           </h3>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
             <div className="rounded-xl border border-[#24543b] bg-[#10251a] p-5">
               <div className="text-2xl">👥</div>
               <h4 className="mt-3 font-semibold">
@@ -128,8 +123,8 @@ export default function AdminDashboardPage() {
               <p className="mt-1 text-xs text-gray-400">
                 Manage registered users
               </p>
-              <p className="mt-3 text-xs text-yellow-400">
-                Coming soon
+              <p className="mt-3 text-xs text-green-400">
+                Next Step
               </p>
             </div>
 
@@ -142,7 +137,7 @@ export default function AdminDashboardPage() {
                 Review deposit requests
               </p>
               <p className="mt-3 text-xs text-yellow-400">
-                Coming soon
+                Coming later
               </p>
             </div>
 
@@ -155,13 +150,11 @@ export default function AdminDashboardPage() {
                 Review withdrawal requests
               </p>
               <p className="mt-3 text-xs text-yellow-400">
-                Coming soon
+                Coming later
               </p>
             </div>
-
           </div>
         </div>
-
       </section>
     </main>
   );
