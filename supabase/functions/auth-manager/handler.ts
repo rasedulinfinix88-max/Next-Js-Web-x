@@ -12,8 +12,7 @@ const corsHeaders = {
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const serviceRoleKey =
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 function response(data: any, status = 200) {
@@ -26,12 +25,10 @@ function response(data: any, status = 200) {
   });
 }
 
-// Mobile number normalization
 function normalizeMobile(value: string) {
   return value.replace(/\D/g, "");
 }
 
-// Secret PIN hashing using PBKDF2
 async function hashSecretPin(pin: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
 
@@ -65,7 +62,6 @@ async function hashSecretPin(pin: string) {
   return `pbkdf2_sha256$210000$${saltHex}$${hashHex}`;
 }
 
-// Generate unique 8-digit Lottery ID
 async function generateLotteryId(supabase: any) {
   for (let attempt = 0; attempt < 30; attempt++) {
     const randomBytes = crypto.getRandomValues(new Uint32Array(1));
@@ -113,32 +109,29 @@ serve(async (req) => {
 
     const body = await req.json();
 
-    const {
-      action,
-      full_name,
-      password,
-      confirm_password,
-      secret_pin,
-      ref,
-    } = body;
+    const { action, password, ref } = body;
 
     // =========================================
-    // 1. SIGNUP
+    // SIGNUP
     // =========================================
 
     if (action === "signup") {
-      const fullName = String(full_name ?? "").trim();
+      const fullName = String(
+        body.full_name ?? body.fullName ?? ""
+      ).trim();
+
       const mobile = normalizeMobile(
         String(body.user_mobile ?? body.mobile ?? "")
       );
 
       const userPassword = String(password ?? "");
+
       const confirmPassword = String(
-        confirm_password ?? body.confirmPassword ?? ""
+        body.confirm_password ?? body.confirmPassword ?? ""
       );
 
       const secretPin = String(
-        secret_pin ?? body.secretPin ?? ""
+        body.secret_pin ?? body.secretPin ?? ""
       );
 
       if (
@@ -148,7 +141,10 @@ serve(async (req) => {
         !confirmPassword ||
         !secretPin
       ) {
-        return response({ error: "All signup fields are required" }, 400);
+        return response(
+          { error: "All signup fields are required" },
+          400
+        );
       }
 
       if (mobile.length < 10 || mobile.length > 15) {
@@ -156,7 +152,10 @@ serve(async (req) => {
       }
 
       if (userPassword !== confirmPassword) {
-        return response({ error: "Passwords do not match" }, 400);
+        return response(
+          { error: "Passwords do not match" },
+          400
+        );
       }
 
       if (userPassword.length < 8) {
@@ -173,7 +172,7 @@ serve(async (req) => {
         );
       }
 
-      // Check whether mobile is already registered
+      // Check duplicate mobile
       const { data: existingMobile, error: mobileCheckError } =
         await supabaseAdmin
           .from("profiles")
@@ -190,16 +189,16 @@ serve(async (req) => {
         );
       }
 
-      // Generate Lottery ID on backend
+      // Generate Lottery ID
       const lotteryId = await generateLotteryId(supabaseAdmin);
 
       // Hash Secret PIN
       const hashedPin = await hashSecretPin(secretPin);
 
-      // Internal email for Supabase Auth
+      // Internal Supabase Auth email
       const email = `${mobile}@user.local`;
 
-      // Create Supabase Auth user
+      // Create Auth user
       const { data: authData, error: authError } =
         await supabaseAdmin.auth.admin.createUser({
           email,
@@ -225,6 +224,7 @@ serve(async (req) => {
           id: authData.user.id,
           full_name: fullName,
           user_mobile: mobile,
+          user_email: email,
           lottery_id: lotteryId,
           user_secret_pin: hashedPin,
           account_status: "active",
@@ -236,10 +236,7 @@ serve(async (req) => {
         throw profileError;
       }
 
-      // =========================================
-      // REFERRAL LOGIC
-      // =========================================
-
+      // Referral logic
       if (ref) {
         try {
           const referralCode = String(ref).trim();
@@ -287,7 +284,7 @@ serve(async (req) => {
     }
 
     // =========================================
-    // 2. LOGIN WITH LOTTERY ID OR MOBILE
+    // LOGIN
     // =========================================
 
     if (action === "login") {
@@ -296,6 +293,7 @@ serve(async (req) => {
         body.lottery_id ??
         body.user_mobile ??
         body.mobile ??
+        body.game_id ??
         ""
       ).trim();
 
@@ -308,19 +306,20 @@ serve(async (req) => {
         );
       }
 
-      const normalizedIdentifier = normalizeMobile(identifier);
-
-      // First search by Lottery ID
-      let { data: profile, error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .select("id, lottery_id, user_mobile, account_status")
-        .eq("lottery_id", identifier)
-        .maybeSingle();
+      // Find by Lottery ID first
+      let { data: profile, error: profileError } =
+        await supabaseAdmin
+          .from("profiles")
+          .select("id, lottery_id, user_mobile, account_status")
+          .eq("lottery_id", identifier)
+          .maybeSingle();
 
       if (profileError) throw profileError;
 
-      // If not found, search by mobile
+      // Otherwise find by mobile
       if (!profile) {
+        const normalizedIdentifier = normalizeMobile(identifier);
+
         const { data, error } = await supabaseAdmin
           .from("profiles")
           .select("id, lottery_id, user_mobile, account_status")
