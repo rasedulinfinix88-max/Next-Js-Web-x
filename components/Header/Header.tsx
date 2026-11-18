@@ -94,7 +94,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setIsMenuOpen(false);
-    router.push("/Next-Js-Web-x/Client/Login/");
+    router.push("/Client/Login/");
   };
 
   return (
@@ -112,7 +112,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
             <button
-              onClick={() => router.push("/Next-Js-Web-x/Notification")}
+              onClick={() => router.push("/Notification")}
               className="relative p-1.5 rounded-full bg-black/20 hover:bg-black/40 transition border border-white/10"
             >
               <Icons.Bell />
@@ -123,14 +123,14 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
           ) : (
             <div className="flex items-center gap-2">
               <Link
-                href="/Next-Js-Web-x/Client/Login/"
+                href="/Client/Login/"
                 className="border border-white text-white px-3 py-1.5 rounded-full text-[11px] font-bold hover:bg-white/10 transition"
               >
                 {t("Login", "লগইন")}
               </Link>
 
               <Link
-                href="/Next-Js-Web-x/Client/Sign-up/"
+                href="/Client/Sign-up/"
                 className="bg-white text-black px-3 py-1.5 rounded-full text-[11px] font-bold hover:opacity-90 transition"
               >
                 {t("Signup", "সাইনআপ")}
@@ -161,7 +161,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Next-Js-Web-x/Lottery/Secure-payment");
+                router.push("/Lottery/Secure-payment");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
@@ -176,7 +176,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Next-Js-Web-x/Lottery/withdraw-terms");
+                    router.push("/Lottery/withdraw-terms");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -189,7 +189,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Next-Js-Web-x/Lottery/winners");
+                    router.push("/Lottery/winners");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -202,7 +202,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Next-Js-Web-x/Lottery/Transactions-activity");
+                    router.push("/Lottery/Transactions-activity");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -217,7 +217,7 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Next-Js-Web-x/Lottery/withdraw-terms");
+                router.push("/Lottery/withdraw-terms");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
