@@ -2,6 +2,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+import { LanguageProvider } from "../lib/LanguageContext";
+import { SiteSettingsProvider } from "../lib/SiteSettingsContext";
+
 export const metadata: Metadata = {
   title: {
     default: "Next-Js-Web-x",
@@ -28,7 +31,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LanguageProvider>
+          <SiteSettingsProvider>
+            {children}
+          </SiteSettingsProvider>
+        </LanguageProvider>
+      </body>
     </html>
   );
 }
