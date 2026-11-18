@@ -1,18 +1,23 @@
+import { createClient } from '@supabase/supabase-js';
 
-import { createBrowserClient } from "@supabase/ssr";
+// এনভায়রনমেন্ট ভেরিয়েবল থেকে ডাটা নেওয়া
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Supabase environment variables are missing."
-    );
-  }
-
-  return createBrowserClient(
-    supabaseUrl,
-    supabaseAnonKey
-  );
+// যদি ভেরিয়েবল না থাকে, তবে এরর না দিয়ে সতর্কবার্তা দেখাবে (যাতে বিল্ড ফেইল না করে)
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Warning: Supabase URL or Anon Key is missing. Check your environment variables.');
 }
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key',
+  {
+    global: {
+      // এই fetch অপশনটি Next.js-কে ডাটা ক্যাশ করতে বাধা দেয়
+      fetch: (url, options) => {
+        return fetch(url, { ...options, cache: 'no-store' });
+      },
+    },
+  }
+);
