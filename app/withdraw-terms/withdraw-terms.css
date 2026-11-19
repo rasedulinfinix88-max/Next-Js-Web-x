@@ -1,0 +1,140 @@
+/* =========================================
+   Main Layout (Fixed Height & No Page Scroll)
+   ========================================= */
+.terms-page-wrapper {
+  background-color: #0d241e;
+  height: 100dvh; /* মোবাইলের জন্য পারফেক্ট ফুল হাইট */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* পুরো পেজ স্ক্রল বন্ধ */
+}
+
+.terms-page {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: 85px; /* ফুটারের জন্য নিচে জায়গা রাখা হলো যাতে বাটন ঢেকে না যায় */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.terms-card {
+  background: rgba(27, 42, 35, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #FFFFFF;
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+  
+  display: flex;
+  flex-direction: column;
+  max-height: 100%; /* কার্ড সর্বোচ্চ এরিয়ার সমান হবে */
+}
+
+.terms-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #FFFFFF;
+  text-align: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+/* =========================================
+   Scrollable Text Box
+   ========================================= */
+.terms-scroll-box {
+  background: #0d241e;
+  border: 1px solid #2B4236;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 12px;
+  color: #A0ADB0;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* কাস্টম স্ক্রলবার ডিজাইন */
+.terms-scroll-box::-webkit-scrollbar {
+  width: 6px;
+}
+.terms-scroll-box::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+.terms-scroll-box::-webkit-scrollbar-thumb {
+  background: #FFFFFF;
+  border-radius: 10px;
+}
+
+.terms-scroll-box h3 {
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.terms-scroll-box h3:first-child {
+  margin-top: 0;
+}
+
+.terms-scroll-box p {
+  margin-bottom: 12px;
+  text-align: justify;
+}
+
+/* =========================================
+   Checkbox & Button
+   ========================================= */
+.terms-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #fff;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.terms-checkbox {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: #FFFFFF;
+  cursor: pointer;
+}
+
+.terms-btn {
+  width: 100%;
+  padding: 14px;
+  background: #184f35;
+  border: 1px solid #FFFFFF;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.terms-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #2B4236;
+  border-color: #2B4236;
+}
