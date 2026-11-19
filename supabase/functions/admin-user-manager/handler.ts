@@ -32,6 +32,40 @@ function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+// Same PBKDF2 format used by auth-manager.
+async function hashSecretPin(pin: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(pin),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 210000,
+      hash: "SHA-256",
+    },
+    key,
+    256
+  );
+
+  const saltHex = Array.from(salt)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const hashHex = Array.from(new Uint8Array(derivedBits))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return `pbkdf2_sha256$210000$${saltHex}$${hashHex}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -290,7 +324,6 @@ serve(async (req) => {
         );
       }
 
-      // An administrator cannot change their own account status.
       if (targetUserId === actor.id) {
         return response(
           { error: "You cannot change your own account status" },
@@ -298,7 +331,6 @@ serve(async (req) => {
         );
       }
 
-      // Fetch target account.
       const { data: target, error: targetError } =
         await supabaseAdmin
           .from("profiles")
@@ -315,8 +347,6 @@ serve(async (req) => {
         return response({ error: "User not found" }, 404);
       }
 
-      // Super Admin accounts cannot be suspended or activated
-      // through this action.
       if (target.user_role === "super_admin") {
         return response(
           { error: "Super Admin accounts cannot be changed here" },
@@ -324,7 +354,6 @@ serve(async (req) => {
         );
       }
 
-      // Ordinary Admin cannot change another Admin account.
       if (
         actor.user_role === "admin" &&
         target.user_role !== "user"
@@ -349,8 +378,7 @@ serve(async (req) => {
         });
       }
 
-      // Conditional update to avoid overwriting a concurrent change.
-      let updateQuery = supabaseAdmin
+      const { data: updated, error: updateError } = await supabaseAdmin
         .from("profiles")
         .update({
           account_status: newStatus,
@@ -358,9 +386,7 @@ serve(async (req) => {
         })
         .eq("id", target.id)
         .eq("user_role", target.user_role)
-        .eq("account_status", target.account_status);
-
-      const { data: updated, error: updateError } = await updateQuery
+        .eq("account_status", target.account_status)
         .select("id, account_status, user_role")
         .maybeSingle();
 
@@ -376,7 +402,6 @@ serve(async (req) => {
         );
       }
 
-      // Record the administrator action.
       const { error: auditError } = await supabaseAdmin
         .from("admin_user_audit_logs")
         .insert({
@@ -403,7 +428,7 @@ serve(async (req) => {
           user_id: updated.id,
           account_status: updated.account_status,
           audit_saved: false,
-        }, 200);
+        });
       }
 
       return response({
@@ -414,6 +439,181 @@ serve(async (req) => {
         changed: true,
         audit_saved: true,
       });
+    }
+
+    // =========================================
+    // VERIFY PASSWORD / PIN RESET PERMISSION
+    // =========================================
+
+    if (
+      action === "reset_user_password" ||
+      action === "reset_user_pin"
+    ) {
+      const targetUserId = String(body.user_id ?? "").trim();
+
+      if (!isValidUuid(targetUserId)) {
+        return response({ error: "Valid user ID is required" }, 400);
+      }
+
+      const { data: target, error: targetError } =
+        await supabaseAdmin
+          .from("profiles")
+          .select("id, full_name, lottery_id, user_role")
+          .eq("id", targetUserId)
+          .maybeSingle();
+
+      if (targetError) {
+        console.error("Credential target lookup error:", targetError);
+        return response({ error: "Could not verify target account" }, 500);
+      }
+
+      if (!target) {
+        return response({ error: "User not found" }, 404);
+      }
+
+      // Super Admin accounts cannot be reset through this action.
+      if (target.user_role === "super_admin") {
+        return response(
+          { error: "Super Admin credentials cannot be reset here" },
+          403
+        );
+      }
+
+      // Admin can reset ordinary User credentials only.
+      if (
+        actor.user_role === "admin" &&
+        target.user_role !== "user"
+      ) {
+        return response(
+          { error: "Only Super Admin can reset Admin credentials" },
+          403
+        );
+      }
+
+      if (!["user", "admin"].includes(target.user_role)) {
+        return response({ error: "Target role is not supported" }, 403);
+      }
+
+      // =========================================
+      // RESET PASSWORD USING SUPABASE AUTH
+      // =========================================
+
+      if (action === "reset_user_password") {
+        const newPassword = String(body.new_password ?? "");
+
+        if (newPassword.length < 8 || newPassword.length > 128) {
+          return response(
+            { error: "Password must be 8 to 128 characters long" },
+            400
+          );
+        }
+
+        const { data: authUpdate, error: passwordError } =
+          await supabaseAdmin.auth.admin.updateUserById(
+            target.id,
+            { password: newPassword }
+          );
+
+        if (passwordError || !authUpdate.user) {
+          console.error("Password reset error:", passwordError);
+          return response(
+            { error: "Could not reset user password" },
+            500
+          );
+        }
+
+        const { error: auditError } = await supabaseAdmin
+          .from("admin_user_audit_logs")
+          .insert({
+            actor_id: actor.id,
+            target_user_id: target.id,
+            action: "password_reset",
+            details: {
+              actor_role: actor.user_role,
+              target_role: target.user_role,
+              target_lottery_id: target.lottery_id,
+            },
+          });
+
+        if (auditError) {
+          console.error("Password reset audit error:", auditError);
+
+          return response({
+            success: true,
+            message: "Password reset, but audit log could not be saved",
+            audit_saved: false,
+          });
+        }
+
+        return response({
+          success: true,
+          message: "Password successfully reset",
+          audit_saved: true,
+        });
+      }
+
+      // =========================================
+      // RESET SECRET PIN USING PBKDF2
+      // =========================================
+
+      if (action === "reset_user_pin") {
+        const newPin = String(body.new_pin ?? "");
+
+        if (!/^\d{4}$/.test(newPin)) {
+          return response(
+            { error: "Secret PIN must contain exactly 4 digits" },
+            400
+          );
+        }
+
+        const hashedPin = await hashSecretPin(newPin);
+
+        const { error: pinUpdateError } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            user_secret_pin: hashedPin,
+            update_at: new Date().toISOString(),
+          })
+          .eq("id", target.id)
+          .eq("user_role", target.user_role);
+
+        if (pinUpdateError) {
+          console.error("PIN reset error:", pinUpdateError);
+          return response(
+            { error: "Could not reset user Secret PIN" },
+            500
+          );
+        }
+
+        const { error: auditError } = await supabaseAdmin
+          .from("admin_user_audit_logs")
+          .insert({
+            actor_id: actor.id,
+            target_user_id: target.id,
+            action: "secret_pin_reset",
+            details: {
+              actor_role: actor.user_role,
+              target_role: target.user_role,
+              target_lottery_id: target.lottery_id,
+            },
+          });
+
+        if (auditError) {
+          console.error("PIN reset audit error:", auditError);
+
+          return response({
+            success: true,
+            message: "Secret PIN reset, but audit log could not be saved",
+            audit_saved: false,
+          });
+        }
+
+        return response({
+          success: true,
+          message: "Secret PIN successfully reset",
+          audit_saved: true,
+        });
+      }
     }
 
     return response({ error: "Invalid action" }, 400);
