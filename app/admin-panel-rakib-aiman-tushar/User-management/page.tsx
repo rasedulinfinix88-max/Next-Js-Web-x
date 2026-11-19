@@ -46,22 +46,27 @@ export default function UserManagementPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     limit: 25,
     total: 0,
     total_pages: 0,
   });
+
   const [selectedUser, setSelectedUser] =
     useState<UserProfile | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
 
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [adminRole, setAdminRole] = useState("");
+  const [currentAdminId, setCurrentAdminId] = useState("");
+  const [updatingUserId, setUpdatingUserId] = useState("");
 
   const fetchUsers = useCallback(
     async (nextPage = 1) => {
@@ -121,6 +126,14 @@ export default function UserManagementPage() {
 
       setAdminRole(access.role || "");
 
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!active) return;
+
+      setCurrentAdminId(authUser?.id || "");
+
       await fetchUsers(1);
 
       if (active) {
@@ -133,12 +146,13 @@ export default function UserManagementPage() {
     return () => {
       active = false;
     };
-  }, [router, fetchUsers]);
+  }, [router, fetchUsers, supabase]);
 
   async function openUserDetails(userId: string) {
     setLoadingDetails(true);
     setSelectedUser(null);
     setError("");
+    setNotice("");
 
     try {
       const { data, error: functionError } =
@@ -164,6 +178,90 @@ export default function UserManagementPage() {
       );
     } finally {
       setLoadingDetails(false);
+    }
+  }
+
+  function canManageAccount(user: UserProfile) {
+    if (!currentAdminId || user.id === currentAdminId) {
+      return false;
+    }
+
+    if (user.user_role === "super_admin") {
+      return false;
+    }
+
+    if (adminRole === "super_admin") {
+      return user.user_role === "user" || user.user_role === "admin";
+    }
+
+    if (adminRole === "admin") {
+      return user.user_role === "user";
+    }
+
+    return false;
+  }
+
+  async function handleAccountStatus(user: UserProfile) {
+    if (!canManageAccount(user) || updatingUserId) {
+      return;
+    }
+
+    const newStatus =
+      user.account_status === "active" ? "suspended" : "active";
+
+    const actionText =
+      newStatus === "suspended" ? "Suspend" : "Activate";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${actionText.toLowerCase()} this account?\n\n` +
+        `Name: ${user.full_name || "Unnamed User"}\n` +
+        `Lottery ID: ${user.lottery_id || "—"}\n` +
+        `New Status: ${newStatus}`
+    );
+
+    if (!confirmed) return;
+
+    setUpdatingUserId(user.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const { data, error: functionError } =
+        await supabase.functions.invoke("admin-user-manager", {
+          body: {
+            action: "set_account_status",
+            user_id: user.id,
+            status: newStatus,
+          },
+        });
+
+      if (functionError) {
+        throw new Error(
+          functionError.message || "Account status update failed"
+        );
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Account status update failed");
+      }
+
+      if (data.audit_saved === false) {
+        setNotice(
+          "Account status changed, but the audit log could not be saved. Please check the audit log."
+        );
+      } else {
+        setNotice(data.message || `Account successfully ${newStatus}.`);
+      }
+
+      await fetchUsers(page);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not update account status"
+      );
+    } finally {
+      setUpdatingUserId("");
     }
   }
 
@@ -221,7 +319,7 @@ export default function UserManagementPage() {
         <div>
           <h2 className="text-xl font-bold">User Management</h2>
           <p className="mt-1 text-sm text-gray-400">
-            Search, filter and view registered accounts.
+            Search, filter, view and manage registered accounts.
           </p>
         </div>
 
@@ -307,6 +405,12 @@ export default function UserManagementPage() {
           </div>
         )}
 
+        {notice && (
+          <div className="rounded-lg border border-[#315d45] bg-[#10251a] p-3 text-sm text-green-300">
+            {notice}
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-xl border border-[#244632] bg-[#10251a]">
           <div className="flex items-center justify-between border-b border-[#244632] p-4">
             <h3 className="font-semibold">Registered Accounts</h3>
@@ -326,14 +430,16 @@ export default function UserManagementPage() {
           ) : (
             <div className="divide-y divide-[#244632]">
               {users.map((user) => (
-                <button
-                  type="button"
+                <div
                   key={user.id}
-                  onClick={() => openUserDetails(user.id)}
-                  className="w-full p-4 text-left transition hover:bg-[#193b29]"
+                  className="p-4 transition hover:bg-[#193b29]"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => openUserDetails(user.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
                       <p className="truncate font-semibold">
                         {user.full_name || "Unnamed User"}
                       </p>
@@ -349,11 +455,15 @@ export default function UserManagementPage() {
                       <p className="mt-2 text-xs text-gray-300">
                         Balance: {user.balance ?? 0}
                       </p>
-                    </div>
+
+                      <p className="mt-2 text-xs text-gray-500">
+                        View Details →
+                      </p>
+                    </button>
 
                     <div className="shrink-0 text-right">
                       <span className="rounded-md bg-[#193b29] px-2 py-1 text-[10px] text-green-300">
-                        {user.user_role}
+                        {user.user_role || "—"}
                       </span>
 
                       <p
@@ -363,15 +473,30 @@ export default function UserManagementPage() {
                             : "text-red-400"
                         }`}
                       >
-                        {user.account_status}
+                        {user.account_status || "Unknown"}
                       </p>
 
-                      <p className="mt-2 text-xs text-gray-500">
-                        View Details →
-                      </p>
+                      {canManageAccount(user) && (
+                        <button
+                          type="button"
+                          disabled={updatingUserId !== ""}
+                          onClick={() => handleAccountStatus(user)}
+                          className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 ${
+                            user.account_status === "active"
+                              ? "bg-red-700 hover:bg-red-600"
+                              : "bg-green-700 hover:bg-green-600"
+                          }`}
+                        >
+                          {updatingUserId === user.id
+                            ? "Updating..."
+                            : user.account_status === "active"
+                            ? "Suspend"
+                            : "Activate"}
+                        </button>
+                      )}
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
