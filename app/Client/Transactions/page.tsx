@@ -2,10 +2,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "../../lib/supabase/client";
-import { useLanguage } from "../../lib/LanguageContext";
-import LotteryHeader from "../../components/Header/Header";
-import LotteryFooter from "../../components/Footer/Footer";
+import { supabase } from "../../../lib/supabase/client";
+import { useLanguage } from "../../../lib/LanguageContext";
+import LotteryHeader from "../../../components/Header/Header";
+import LotteryFooter from "../../../components/Footer/Footer";
 
 type TabType = "deposit" | "withdrawal" | "usdt";
 
@@ -44,8 +44,12 @@ export default function TransactionsPage() {
         await supabase.auth.getUser();
 
       if (authError || !authData.user) {
-        setDepositError(t("Please login to view transactions.", "লেনদেন দেখতে লগইন করুন।"));
-        setWithdrawalError(t("Please login to view transactions.", "লেনদেন দেখতে লগইন করুন।"));
+        setDepositError(
+          t("Please login to view transactions.", "লেনদেন দেখতে লগইন করুন।")
+        );
+        setWithdrawalError(
+          t("Please login to view transactions.", "লেনদেন দেখতে লগইন করুন।")
+        );
         return;
       }
 
@@ -65,7 +69,10 @@ export default function TransactionsPage() {
 
       if (depositResult.error) {
         setDepositError(
-          t("Unable to load deposit history.", "ডিপোজিট হিস্টোরি লোড করা যায়নি।")
+          t(
+            "Unable to load deposit history.",
+            "ডিপোজিট হিস্টোরি লোড করা যায়নি।"
+          )
         );
         setDepositHistory([]);
       } else {
@@ -91,7 +98,10 @@ export default function TransactionsPage() {
 
       if (withdrawalResult.error) {
         setWithdrawalError(
-          t("Unable to load withdrawal history.", "উইথড্র হিস্টোরি লোড করা যায়নি।")
+          t(
+            "Unable to load withdrawal history.",
+            "উইথড্র হিস্টোরি লোড করা যায়নি।"
+          )
         );
         setWithdrawalHistory([]);
       } else {
@@ -114,10 +124,16 @@ export default function TransactionsPage() {
       }
     } catch {
       setDepositError(
-        t("Something went wrong while loading history.", "হিস্টোরি লোড করার সময় সমস্যা হয়েছে।")
+        t(
+          "Something went wrong while loading history.",
+          "হিস্টোরি লোড করার সময় সমস্যা হয়েছে।"
+        )
       );
       setWithdrawalError(
-        t("Something went wrong while loading history.", "হিস্টোরি লোড করার সময় সমস্যা হয়েছে।")
+        t(
+          "Something went wrong while loading history.",
+          "হিস্টোরি লোড করার সময় সমস্যা হয়েছে।"
+        )
       );
     } finally {
       setLoading(false);
@@ -131,8 +147,7 @@ export default function TransactionsPage() {
   const usdtHistory = useMemo(() => {
     return [...depositHistory, ...withdrawalHistory]
       .filter(
-        (item) =>
-          item.payment_method_code?.toLowerCase() === "usdt"
+        (item) => item.payment_method_code?.toLowerCase() === "usdt"
       )
       .sort(
         (a, b) =>
