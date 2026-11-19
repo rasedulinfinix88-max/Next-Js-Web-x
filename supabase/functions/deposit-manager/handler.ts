@@ -169,20 +169,28 @@ serve(async (req) => {
 
     if (actorError) {
       logDatabaseError("Load user profile failed", actorError);
+
+      logDiagnostic("403_PROFILE_QUERY_FAILED", {
+        user_id: user.id,
+      });
+
       return response({ error: "User profile not found" }, 403);
     }
 
     if (!actor) {
-      logDiagnostic("User profile missing", {
+      logDiagnostic("403_PROFILE_NOT_FOUND", {
         user_id: user.id,
       });
+
       return response({ error: "User profile not found" }, 403);
     }
 
     if (actor.account_status !== "active") {
-      logDiagnostic("User account is not active", {
+      logDiagnostic("403_ACCOUNT_NOT_ACTIVE", {
         account_status: actor.account_status,
+        user_id: user.id,
       });
+
       return response({ error: "Account is not active" }, 403);
     }
 
@@ -236,7 +244,6 @@ serve(async (req) => {
           account_name,
           admin_payment_number,
           wallet_address,
-          network,
           method_logo_url,
           instructions,
           min_deposit,
@@ -273,6 +280,11 @@ serve(async (req) => {
       diagnosticStep = "create_deposit_validation";
 
       if (actor.user_role !== "user") {
+        logDiagnostic("403_USER_ROLE_REJECTED", {
+          user_role: actor.user_role,
+          user_id: user.id,
+        });
+
         return response({ error: "This action is for users only" }, 403);
       }
 
@@ -281,19 +293,36 @@ serve(async (req) => {
       const transactionId = String(body.transaction_id ?? "").trim();
       const senderAccount = String(body.sender_account ?? "").trim();
 
+      logDiagnostic("CREATE_DEPOSIT_INPUT", {
+        payment_method_id: methodId,
+        amount_valid: amount !== null,
+        transaction_id_present: Boolean(transactionId),
+        sender_account_present: Boolean(senderAccount),
+      });
+
       if (!isValidUuid(methodId)) {
+        logDiagnostic("CREATE_DEPOSIT_INVALID_METHOD_ID", {
+          payment_method_id: methodId,
+        });
+
         return response({ error: "Valid payment method is required" }, 400);
       }
 
       if (amount === null) {
+        logDiagnostic("CREATE_DEPOSIT_INVALID_AMOUNT");
         return response({ error: "Invalid deposit amount" }, 400);
       }
 
       if (transactionId.length < 3 || transactionId.length > 120) {
+        logDiagnostic("CREATE_DEPOSIT_INVALID_TRANSACTION_ID", {
+          length: transactionId.length,
+        });
+
         return response({ error: "Transaction ID must be 3 to 120 characters" }, 400);
       }
 
       if (senderAccount.length > 120) {
+        logDiagnostic("CREATE_DEPOSIT_SENDER_ACCOUNT_TOO_LONG");
         return response({ error: "Sender account is too long" }, 400);
       }
 
@@ -308,11 +337,16 @@ serve(async (req) => {
       }
 
       if (!global) {
-        logDiagnostic("Create deposit: GLOBAL row not found");
+        logDiagnostic("CREATE_DEPOSIT_GLOBAL_ROW_NOT_FOUND");
         return response({ error: "Deposit settings unavailable" }, 500);
       }
 
       if (!global.is_deposit_enabled) {
+        logDiagnostic("403_DEPOSIT_SYSTEM_DISABLED", {
+          is_deposit_enabled: global.is_deposit_enabled,
+          maintenance_message: global.maintenance_message,
+        });
+
         return response({
           error: global.maintenance_message ||
             "Deposit service is temporarily unavailable",
@@ -343,10 +377,19 @@ serve(async (req) => {
       }
 
       if (!method) {
+        logDiagnostic("CREATE_DEPOSIT_METHOD_NOT_FOUND", {
+          payment_method_id: methodId,
+        });
+
         return response({ error: "Payment method not found" }, 404);
       }
 
       if (!method.is_active || method.method_code === "GLOBAL") {
+        logDiagnostic("403_PAYMENT_METHOD_UNAVAILABLE", {
+          method_code: method.method_code,
+          is_active: method.is_active,
+        });
+
         return response({ error: "Payment method is unavailable" }, 403);
       }
 
@@ -356,6 +399,13 @@ serve(async (req) => {
           : Boolean(method.admin_payment_number?.trim());
 
       if (!paymentDetailsReady) {
+        logDiagnostic("403_PAYMENT_DETAILS_MISSING", {
+          method_code: method.method_code,
+          method_type: method.method_type,
+          wallet_address_present: Boolean(method.wallet_address?.trim()),
+          admin_payment_number_present: Boolean(method.admin_payment_number?.trim()),
+        });
+
         return response({
           error: "This payment method is not configured yet",
         }, 403);
@@ -365,6 +415,12 @@ serve(async (req) => {
         method.min_deposit !== null &&
         amount < Number(method.min_deposit)
       ) {
+        logDiagnostic("CREATE_DEPOSIT_BELOW_MINIMUM", {
+          method_code: method.method_code,
+          min_deposit: method.min_deposit,
+          submitted_amount: amount,
+        });
+
         return response({
           error: `Minimum deposit is ${method.min_deposit}`,
         }, 400);
@@ -374,12 +430,24 @@ serve(async (req) => {
         method.max_deposit !== null &&
         amount > Number(method.max_deposit)
       ) {
+        logDiagnostic("CREATE_DEPOSIT_ABOVE_MAXIMUM", {
+          method_code: method.method_code,
+          max_deposit: method.max_deposit,
+          submitted_amount: amount,
+        });
+
         return response({
           error: `Maximum deposit is ${method.max_deposit}`,
         }, 400);
       }
 
       diagnosticStep = "insert_deposit_request";
+
+      logDiagnostic("CREATE_DEPOSIT_INSERT_STARTED", {
+        user_id: user.id,
+        method_code: method.method_code,
+        amount,
+      });
 
       const { data: deposit, error: insertError } =
         await supabaseAdmin
@@ -409,6 +477,10 @@ serve(async (req) => {
 
       if (insertError) {
         if (insertError.code === "23505") {
+          logDiagnostic("CREATE_DEPOSIT_DUPLICATE_TRANSACTION", {
+            code: insertError.code,
+          });
+
           return response({
             error: "This transaction ID has already been used",
           }, 409);
@@ -417,6 +489,11 @@ serve(async (req) => {
         logDatabaseError("Insert deposit request failed", insertError);
         return response({ error: "Could not create deposit request" }, 500);
       }
+
+      logDiagnostic("CREATE_DEPOSIT_SUCCESS", {
+        deposit_id: deposit.id,
+        deposit_tracking_id: deposit.deposit_tracking_id,
+      });
 
       return response({
         success: true,
