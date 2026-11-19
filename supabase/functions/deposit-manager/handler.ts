@@ -23,6 +23,24 @@ function response(data: unknown, status = 200) {
   });
 }
 
+// Diagnostic logging: never log tokens, passwords or secret keys.
+function logDiagnostic(step: string, details?: unknown) {
+  console.error("[DEPOSIT-MANAGER]", {
+    step,
+    details: details ?? null,
+    time: new Date().toISOString(),
+  });
+}
+
+function logDatabaseError(step: string, error: any) {
+  logDiagnostic(step, {
+    message: error?.message ?? "Unknown database error",
+    code: error?.code ?? null,
+    details: error?.details ?? null,
+    hint: error?.hint ?? null,
+  });
+}
+
 function isValidUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -48,6 +66,13 @@ function validAmount(value: unknown): number | null {
 }
 
 serve(async (req) => {
+  let diagnosticStep = "request_received";
+
+  logDiagnostic("Request received", {
+    method: req.method,
+    pathname: new URL(req.url).pathname,
+  });
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -57,12 +82,22 @@ serve(async (req) => {
   }
 
   try {
+    diagnosticStep = "environment_configuration";
+
     if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+      logDiagnostic("Environment configuration missing", {
+        project_url_present: Boolean(supabaseUrl),
+        service_key_present: Boolean(serviceRoleKey),
+        anon_key_present: Boolean(anonKey),
+      });
+
       return response(
         { error: "Supabase environment configuration is missing" },
         500
       );
     }
+
+    diagnosticStep = "authorization_header";
 
     const authorization = req.headers.get("Authorization");
 
@@ -76,7 +111,8 @@ serve(async (req) => {
       return response({ error: "Invalid access token" }, 401);
     }
 
-    // Verify the caller's Supabase session.
+    diagnosticStep = "verify_user_session";
+
     const supabaseAuth = createClient(supabaseUrl, anonKey, {
       auth: {
         autoRefreshToken: false,
@@ -90,10 +126,16 @@ serve(async (req) => {
     } = await supabaseAuth.auth.getUser(accessToken);
 
     if (authError || !user) {
+      logDiagnostic("User session verification failed", {
+        message: authError?.message ?? "User not found",
+        code: authError?.code ?? null,
+      });
+
       return response({ error: "Invalid or expired session" }, 401);
     }
 
-    // Service-role client for protected database operations.
+    diagnosticStep = "create_database_clients";
+
     const supabaseAdmin = createClient(
       supabaseUrl,
       serviceRoleKey,
@@ -105,7 +147,6 @@ serve(async (req) => {
       }
     );
 
-    // User JWT client for authenticated database functions.
     const supabaseUser = createClient(supabaseUrl, anonKey, {
       auth: {
         autoRefreshToken: false,
@@ -118,28 +159,43 @@ serve(async (req) => {
       },
     });
 
-    // Verify profile and account status.
+    diagnosticStep = "load_user_profile";
+
     const { data: actor, error: actorError } = await supabaseAdmin
       .from("profiles")
       .select("id, user_role, account_status")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (actorError || !actor) {
+    if (actorError) {
+      logDatabaseError("Load user profile failed", actorError);
+      return response({ error: "User profile not found" }, 403);
+    }
+
+    if (!actor) {
+      logDiagnostic("User profile missing", {
+        user_id: user.id,
+      });
       return response({ error: "User profile not found" }, 403);
     }
 
     if (actor.account_status !== "active") {
+      logDiagnostic("User account is not active", {
+        account_status: actor.account_status,
+      });
       return response({ error: "Account is not active" }, 403);
     }
+
+    diagnosticStep = "parse_request_body";
 
     const body = await req.json();
     const action = String(body.action ?? "").trim();
 
+    logDiagnostic("Action received", { action });
+
     const isAdmin = ["admin", "super_admin"].includes(actor.user_role);
     const isSuperAdmin = actor.user_role === "super_admin";
 
-    // Read global deposit configuration.
     async function getGlobalSettings() {
       return await supabaseAdmin
         .from("control_payment_method")
@@ -153,12 +209,22 @@ serve(async (req) => {
     // =========================================
 
     if (action === "get_payment_methods") {
+      diagnosticStep = "get_payment_methods_global_settings";
+
       const { data: global, error: globalError } =
         await getGlobalSettings();
 
-      if (globalError || !global) {
+      if (globalError) {
+        logDatabaseError("Get payment methods: GLOBAL settings query failed", globalError);
         return response({ error: "Deposit settings unavailable" }, 500);
       }
+
+      if (!global) {
+        logDiagnostic("Get payment methods: GLOBAL row not found");
+        return response({ error: "Deposit settings unavailable" }, 500);
+      }
+
+      diagnosticStep = "get_payment_methods_list";
 
       const { data: methods, error } = await supabaseAdmin
         .from("control_payment_method")
@@ -182,9 +248,14 @@ serve(async (req) => {
         .order("method_name");
 
       if (error) {
-        console.error("Payment methods error:", error);
+        logDatabaseError("Get payment methods: methods query failed", error);
         return response({ error: "Could not load payment methods" }, 500);
       }
+
+      logDiagnostic("Get payment methods successful", {
+        method_count: methods?.length ?? 0,
+        deposit_enabled: global.is_deposit_enabled,
+      });
 
       return response({
         success: true,
@@ -199,6 +270,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "create_deposit") {
+      diagnosticStep = "create_deposit_validation";
+
       if (actor.user_role !== "user") {
         return response({ error: "This action is for users only" }, 403);
       }
@@ -224,10 +297,18 @@ serve(async (req) => {
         return response({ error: "Sender account is too long" }, 400);
       }
 
+      diagnosticStep = "create_deposit_global_settings";
+
       const { data: global, error: globalError } =
         await getGlobalSettings();
 
-      if (globalError || !global) {
+      if (globalError) {
+        logDatabaseError("Create deposit: GLOBAL settings query failed", globalError);
+        return response({ error: "Deposit settings unavailable" }, 500);
+      }
+
+      if (!global) {
+        logDiagnostic("Create deposit: GLOBAL row not found");
         return response({ error: "Deposit settings unavailable" }, 500);
       }
 
@@ -237,6 +318,8 @@ serve(async (req) => {
             "Deposit service is temporarily unavailable",
         }, 403);
       }
+
+      diagnosticStep = "create_deposit_payment_method";
 
       const { data: method, error: methodError } = await supabaseAdmin
         .from("control_payment_method")
@@ -254,7 +337,12 @@ serve(async (req) => {
         .eq("id", methodId)
         .maybeSingle();
 
-      if (methodError || !method) {
+      if (methodError) {
+        logDatabaseError("Create deposit: payment method query failed", methodError);
+        return response({ error: "Payment method not found" }, 404);
+      }
+
+      if (!method) {
         return response({ error: "Payment method not found" }, 404);
       }
 
@@ -262,7 +350,6 @@ serve(async (req) => {
         return response({ error: "Payment method is unavailable" }, 403);
       }
 
-      // A method must have its receiving details configured.
       const paymentDetailsReady =
         method.method_type === "crypto"
           ? Boolean(method.wallet_address?.trim())
@@ -291,6 +378,8 @@ serve(async (req) => {
           error: `Maximum deposit is ${method.max_deposit}`,
         }, 400);
       }
+
+      diagnosticStep = "insert_deposit_request";
 
       const { data: deposit, error: insertError } =
         await supabaseAdmin
@@ -325,7 +414,7 @@ serve(async (req) => {
           }, 409);
         }
 
-        console.error("Create deposit error:", insertError);
+        logDatabaseError("Insert deposit request failed", insertError);
         return response({ error: "Could not create deposit request" }, 500);
       }
 
@@ -341,6 +430,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "my_deposit_history") {
+      diagnosticStep = "load_my_deposit_history";
+
       const page = Math.max(
         1,
         Math.min(100000, Number.parseInt(body.page ?? "1", 10) || 1)
@@ -374,7 +465,7 @@ serve(async (req) => {
         .range(from, from + limit - 1);
 
       if (error) {
-        console.error("Deposit history error:", error);
+        logDatabaseError("Deposit history query failed", error);
         return response({ error: "Could not load deposit history" }, 500);
       }
 
@@ -395,6 +486,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "admin_deposit_list") {
+      diagnosticStep = "admin_deposit_list";
+
       if (!isAdmin) {
         return response({ error: "Administrator access denied" }, 403);
       }
@@ -433,7 +526,7 @@ serve(async (req) => {
       const { data, error, count } = await query;
 
       if (error) {
-        console.error("Admin deposit list error:", error);
+        logDatabaseError("Admin deposit list query failed", error);
         return response({ error: "Could not load deposit requests" }, 500);
       }
 
@@ -455,6 +548,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "approve_deposit") {
+      diagnosticStep = "approve_deposit";
+
       if (!isAdmin) {
         return response({ error: "Administrator access denied" }, 403);
       }
@@ -479,7 +574,7 @@ serve(async (req) => {
       );
 
       if (error) {
-        console.error("Approve deposit error:", error);
+        logDatabaseError("Approve deposit RPC failed", error);
         return response({
           error: error.message || "Could not approve deposit",
         }, 400);
@@ -493,6 +588,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "reject_deposit") {
+      diagnosticStep = "reject_deposit";
+
       if (!isAdmin) {
         return response({ error: "Administrator access denied" }, 403);
       }
@@ -519,7 +616,7 @@ serve(async (req) => {
       );
 
       if (error) {
-        console.error("Reject deposit error:", error);
+        logDatabaseError("Reject deposit RPC failed", error);
         return response({
           error: error.message || "Could not reject deposit",
         }, 400);
@@ -533,6 +630,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "update_payment_method") {
+      diagnosticStep = "update_payment_method";
+
       if (!isSuperAdmin) {
         return response({ error: "Super Admin access required" }, 403);
       }
@@ -612,7 +711,12 @@ serve(async (req) => {
         .neq("method_code", "GLOBAL")
         .maybeSingle();
 
-      if (existingError || !existing) {
+      if (existingError) {
+        logDatabaseError("Update payment method: load existing method failed", existingError);
+        return response({ error: "Payment method not found" }, 404);
+      }
+
+      if (!existing) {
         return response({ error: "Payment method not found" }, 404);
       }
 
@@ -660,7 +764,7 @@ serve(async (req) => {
         .single();
 
       if (error) {
-        console.error("Update payment method error:", error);
+        logDatabaseError("Update payment method failed", error);
         return response({ error: "Could not update payment method" }, 500);
       }
 
@@ -676,6 +780,8 @@ serve(async (req) => {
     // =========================================
 
     if (action === "toggle_deposit_system") {
+      diagnosticStep = "toggle_deposit_system";
+
       if (!isSuperAdmin) {
         return response({ error: "Super Admin access required" }, 403);
       }
@@ -707,7 +813,7 @@ serve(async (req) => {
         .single();
 
       if (error) {
-        console.error("Global deposit update error:", error);
+        logDatabaseError("Toggle deposit system failed", error);
         return response({ error: "Could not update deposit settings" }, 500);
       }
 
@@ -720,10 +826,21 @@ serve(async (req) => {
       });
     }
 
+    logDiagnostic("Invalid action received", { action });
     return response({ error: "Invalid action" }, 400);
 
   } catch (error) {
-    console.error("Deposit Manager Error:", error);
+    const errorDetails = error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack ?? null,
+        }
+      : {
+          message: String(error),
+        };
+
+    logDiagnostic(`UNHANDLED ERROR at step: ${diagnosticStep}`, errorDetails);
 
     return response({
       error: "Internal server error",
