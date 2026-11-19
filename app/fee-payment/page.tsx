@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabase/client";
-import { useLanguage } from "../../../lib/LanguageContext";
-import LotteryHeader from "../Header/Header";
+import { supabase } from "../../lib/supabase/client";
+import { useLanguage } from "../../lib/LanguageContext";
+import LotteryHeader from "../../components/Header/Header";
 import "./fee-payment.css";
 
 export default function FeePaymentPage() {
