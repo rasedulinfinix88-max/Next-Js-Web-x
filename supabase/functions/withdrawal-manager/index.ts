@@ -1,1 +1,1 @@
-
+import "./handler.ts";
