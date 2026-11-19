@@ -6,7 +6,6 @@
   position: relative;
   background-color: #0d241e;
 
-  /* মেইন ব্যাকগ্রাউন্ড SVG প্যাটার্ন */
   background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(255,255,255,0.03)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 40h80M20 40v40m20-40v40m20-40v40m20-40v40M10 80h80M50 20L10 40h80L50 20z'/%3E%3Cpath d='M50 25v10m-5-5h10'/%3E%3C/g%3E%3C/svg%3E");
   background-size: 120px 120px;
 }
@@ -30,15 +29,13 @@
 /* ব্যালেন্স কার্ড */
 .balance-card {
   background: rgba(27, 42, 35, 0.85);
-
-  /* প্রথম পরীক্ষার জন্য Blur বন্ধ */
-  /* backdrop-filter: blur(10px); */
-
   border: 1px solid #FFFFFF;
   border-radius: 12px;
   padding: 20px;
   text-align: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+  /* হালকা Shadow */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
 
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='rgba(255,255,255,0.02)' stroke-width='1.5'%3E%3Cpath d='M10 25h40v25H10z'/%3E%3Cpath d='M30 15L10 25h40L30 15z'/%3E%3Cpath d='M20 30v15m20-15v15'/%3E%3C/g%3E%3C/svg%3E");
   background-size: 80px 80px;
@@ -62,14 +59,12 @@
 /* ফর্ম সেকশন */
 .form-card {
   background: rgba(27, 42, 35, 0.85);
-
-  /* প্রথম পরীক্ষার জন্য Blur বন্ধ */
-  /* backdrop-filter: blur(10px); */
-
   border: 1px solid rgba(43, 66, 54, 0.8);
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+
+  /* হালকা Shadow */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
 }
 
 .form-title {
@@ -143,7 +138,9 @@ select.input-field option {
   background: #0d241e;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 40;
-  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3);
+
+  /* হালকা Shadow */
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.22);
 }
 
 .submit-btn {
