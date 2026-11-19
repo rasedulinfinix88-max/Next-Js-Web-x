@@ -3,9 +3,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "../../../../lib/supabase/client";
-import { checkAdminAccess } from "../../../../lib/admin/admin-auth";
-import AdminMenu from "../../../../components/admin/AdminMenu";
+import { createClient } from "../../../lib/supabase/client";
+import { checkAdminAccess } from "../../../lib/admin/admin-auth";
+import AdminMenu from "../../../components/admin/AdminMenu";
 
 const ADMIN_PATH = "/admin-panel-rakib-aiman-tushar";
 
