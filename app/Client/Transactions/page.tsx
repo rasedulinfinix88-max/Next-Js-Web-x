@@ -110,7 +110,7 @@ export default function TransactionsPage() {
         const withdrawals: Transaction[] = history.map((item: any) => ({
           id: item.id,
           type: "withdrawal",
-          tracking_id: item.tracking_id || "",
+          tracking_id: item.withdrawal_tracking_id || "",
           payment_method_code: item.payment_method_code || "",
           payment_method_name: item.payment_method_name || "",
           amount: item.amount,
