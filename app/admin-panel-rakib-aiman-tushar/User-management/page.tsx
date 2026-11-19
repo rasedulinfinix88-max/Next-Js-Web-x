@@ -68,6 +68,12 @@ export default function UserManagementPage() {
   const [currentAdminId, setCurrentAdminId] = useState("");
   const [updatingUserId, setUpdatingUserId] = useState("");
 
+  const [newPassword, setNewPassword] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [resettingCredential, setResettingCredential] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetNotice, setResetNotice] = useState("");
+
   const fetchUsers = useCallback(
     async (nextPage = 1) => {
       setLoadingUsers(true);
@@ -153,6 +159,10 @@ export default function UserManagementPage() {
     setSelectedUser(null);
     setError("");
     setNotice("");
+    setResetError("");
+    setResetNotice("");
+    setNewPassword("");
+    setNewPin("");
 
     try {
       const { data, error: functionError } =
@@ -262,6 +272,132 @@ export default function UserManagementPage() {
       );
     } finally {
       setUpdatingUserId("");
+    }
+  }
+
+  async function handlePasswordReset() {
+    if (!selectedUser || !canManageAccount(selectedUser)) {
+      setResetError("You do not have permission to reset this password.");
+      return;
+    }
+
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setResetError("Password must be between 8 and 128 characters.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reset password for this account?\n\n` +
+        `Name: ${selectedUser.full_name || "Unnamed User"}\n` +
+        `Lottery ID: ${selectedUser.lottery_id || "—"}`
+    );
+
+    if (!confirmed) return;
+
+    setResettingCredential("password");
+    setResetError("");
+    setResetNotice("");
+
+    try {
+      const { data, error: functionError } =
+        await supabase.functions.invoke("admin-user-manager", {
+          body: {
+            action: "reset_user_password",
+            user_id: selectedUser.id,
+            new_password: newPassword,
+          },
+        });
+
+      if (functionError) {
+        throw new Error(
+          functionError.message || "Password reset failed"
+        );
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Password reset failed");
+      }
+
+      setNewPassword("");
+
+      if (data.audit_saved === false) {
+        setResetNotice(
+          "Password changed, but the audit log could not be saved. Please check the audit log."
+        );
+      } else {
+        setResetNotice(
+          data.message || "Password successfully reset."
+        );
+      }
+    } catch (err) {
+      setResetError(
+        err instanceof Error ? err.message : "Password reset failed"
+      );
+    } finally {
+      setResettingCredential("");
+    }
+  }
+
+  async function handlePinReset() {
+    if (!selectedUser || !canManageAccount(selectedUser)) {
+      setResetError("You do not have permission to reset this PIN.");
+      return;
+    }
+
+    if (!/^\d{4}$/.test(newPin)) {
+      setResetError("Secret PIN must contain exactly 4 digits.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reset Secret PIN for this account?\n\n` +
+        `Name: ${selectedUser.full_name || "Unnamed User"}\n` +
+        `Lottery ID: ${selectedUser.lottery_id || "—"}`
+    );
+
+    if (!confirmed) return;
+
+    setResettingCredential("pin");
+    setResetError("");
+    setResetNotice("");
+
+    try {
+      const { data, error: functionError } =
+        await supabase.functions.invoke("admin-user-manager", {
+          body: {
+            action: "reset_user_pin",
+            user_id: selectedUser.id,
+            new_pin: newPin,
+          },
+        });
+
+      if (functionError) {
+        throw new Error(
+          functionError.message || "Secret PIN reset failed"
+        );
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || "Secret PIN reset failed");
+      }
+
+      setNewPin("");
+
+      if (data.audit_saved === false) {
+        setResetNotice(
+          "Secret PIN changed, but the audit log could not be saved. Please check the audit log."
+        );
+      } else {
+        setResetNotice(
+          data.message || "Secret PIN successfully reset."
+        );
+      }
+    } catch (err) {
+      setResetError(
+        err instanceof Error ? err.message : "Secret PIN reset failed"
+      );
+    } finally {
+      setResettingCredential("");
     }
   }
 
@@ -547,7 +683,13 @@ export default function UserManagementPage() {
 
               <button
                 type="button"
-                onClick={() => setSelectedUser(null)}
+                onClick={() => {
+                  setSelectedUser(null);
+                  setNewPassword("");
+                  setNewPin("");
+                  setResetError("");
+                  setResetNotice("");
+                }}
                 className="rounded-lg bg-[#193b29] px-3 py-2"
               >
                 ✕
@@ -598,6 +740,98 @@ export default function UserManagementPage() {
               <p className="pt-2 text-xs text-gray-500">
                 Password and Secret PIN are never displayed.
               </p>
+
+              {canManageAccount(selectedUser) && (
+                <div className="space-y-4 border-t border-[#315d45] pt-4">
+                  <h3 className="font-bold text-green-400">
+                    PASSWORD & PIN MANAGEMENT
+                  </h3>
+
+                  <div className="space-y-2 rounded-xl border border-[#315d45] bg-[#09170f] p-3">
+                    <label className="block text-sm font-semibold">
+                      Reset Password
+                    </label>
+
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      maxLength={128}
+                      className="w-full rounded-lg border border-[#315d45] bg-[#10251a] px-3 py-3 text-sm text-white outline-none focus:border-green-500"
+                    />
+
+                    <p className="text-xs text-gray-500">
+                      Minimum 8 characters. Maximum 128 characters.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={handlePasswordReset}
+                      disabled={
+                        resettingCredential !== "" ||
+                        newPassword.length < 8 ||
+                        newPassword.length > 128
+                      }
+                      className="w-full rounded-lg bg-[#218653] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      {resettingCredential === "password"
+                        ? "Resetting Password..."
+                        : "Reset Password"}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 rounded-xl border border-[#315d45] bg-[#09170f] p-3">
+                    <label className="block text-sm font-semibold">
+                      Reset Secret PIN
+                    </label>
+
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={newPin}
+                      onChange={(e) =>
+                        setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+                      }
+                      placeholder="Enter new 4-digit PIN"
+                      maxLength={4}
+                      className="w-full rounded-lg border border-[#315d45] bg-[#10251a] px-3 py-3 text-sm tracking-[0.5em] text-white outline-none focus:border-green-500"
+                    />
+
+                    <p className="text-xs text-gray-500">
+                      Secret PIN must contain exactly 4 digits.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={handlePinReset}
+                      disabled={
+                        resettingCredential !== "" ||
+                        !/^\d{4}$/.test(newPin)
+                      }
+                      className="w-full rounded-lg bg-[#218653] px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+                    >
+                      {resettingCredential === "pin"
+                        ? "Resetting PIN..."
+                        : "Reset Secret PIN"}
+                    </button>
+                  </div>
+
+                  {resetError && (
+                    <div className="rounded-lg border border-red-700 bg-red-950/40 p-3 text-sm text-red-300">
+                      {resetError}
+                    </div>
+                  )}
+
+                  {resetNotice && (
+                    <div className="rounded-lg border border-[#315d45] bg-[#10251a] p-3 text-sm text-green-300">
+                      {resetNotice}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
