@@ -61,7 +61,7 @@ serve(async (req) => {
       return response({ error: "Invalid access token" }, 401);
     }
 
-    // Verify the caller's access token.
+    // Verify caller's access token.
     const supabaseAuth = createClient(supabaseUrl, anonKey, {
       auth: {
         autoRefreshToken: false,
@@ -78,7 +78,7 @@ serve(async (req) => {
       return response({ error: "Invalid or expired session" }, 401);
     }
 
-    // Service-role client is used only after caller verification.
+    // Service-role client after caller verification.
     const supabaseAdmin = createClient(
       supabaseUrl,
       serviceRoleKey,
@@ -90,7 +90,7 @@ serve(async (req) => {
       }
     );
 
-    // Verify active Admin or Super Admin from the database.
+    // Verify active administrator.
     const { data: actor, error: actorError } = await supabaseAdmin
       .from("profiles")
       .select("id, user_role, account_status")
@@ -172,6 +172,7 @@ serve(async (req) => {
         if (!["user", "admin", "super_admin"].includes(role)) {
           return response({ error: "Invalid role filter" }, 400);
         }
+
         query = query.eq("user_role", role);
       }
 
@@ -179,6 +180,7 @@ serve(async (req) => {
         if (!["active", "suspended"].includes(status)) {
           return response({ error: "Invalid status filter" }, 400);
         }
+
         query = query.eq("account_status", status);
       }
 
@@ -266,6 +268,151 @@ serve(async (req) => {
           ),
         },
         administrator_role: actor.user_role,
+      });
+    }
+
+    // =========================================
+    // CHANGE ACCOUNT STATUS
+    // =========================================
+
+    if (action === "set_account_status") {
+      const targetUserId = String(body.user_id ?? "").trim();
+      const newStatus = String(body.status ?? "").trim();
+
+      if (!isValidUuid(targetUserId)) {
+        return response({ error: "Valid user ID is required" }, 400);
+      }
+
+      if (!["active", "suspended"].includes(newStatus)) {
+        return response(
+          { error: "Status must be active or suspended" },
+          400
+        );
+      }
+
+      // An administrator cannot change their own account status.
+      if (targetUserId === actor.id) {
+        return response(
+          { error: "You cannot change your own account status" },
+          403
+        );
+      }
+
+      // Fetch target account.
+      const { data: target, error: targetError } =
+        await supabaseAdmin
+          .from("profiles")
+          .select("id, full_name, lottery_id, user_role, account_status")
+          .eq("id", targetUserId)
+          .maybeSingle();
+
+      if (targetError) {
+        console.error("Target lookup error:", targetError);
+        return response({ error: "Could not verify target account" }, 500);
+      }
+
+      if (!target) {
+        return response({ error: "User not found" }, 404);
+      }
+
+      // Super Admin accounts cannot be suspended or activated
+      // through this action.
+      if (target.user_role === "super_admin") {
+        return response(
+          { error: "Super Admin accounts cannot be changed here" },
+          403
+        );
+      }
+
+      // Ordinary Admin cannot change another Admin account.
+      if (
+        actor.user_role === "admin" &&
+        target.user_role !== "user"
+      ) {
+        return response(
+          { error: "Only Super Admin can manage Admin accounts" },
+          403
+        );
+      }
+
+      if (!["user", "admin"].includes(target.user_role)) {
+        return response({ error: "Target role is not supported" }, 403);
+      }
+
+      if (target.account_status === newStatus) {
+        return response({
+          success: true,
+          message: `Account is already ${newStatus}`,
+          user_id: target.id,
+          account_status: target.account_status,
+          changed: false,
+        });
+      }
+
+      // Conditional update to avoid overwriting a concurrent change.
+      let updateQuery = supabaseAdmin
+        .from("profiles")
+        .update({
+          account_status: newStatus,
+          update_at: new Date().toISOString(),
+        })
+        .eq("id", target.id)
+        .eq("user_role", target.user_role)
+        .eq("account_status", target.account_status);
+
+      const { data: updated, error: updateError } = await updateQuery
+        .select("id, account_status, user_role")
+        .maybeSingle();
+
+      if (updateError) {
+        console.error("Account status update error:", updateError);
+        return response({ error: "Could not update account status" }, 500);
+      }
+
+      if (!updated) {
+        return response(
+          { error: "Account changed during this request. Please refresh." },
+          409
+        );
+      }
+
+      // Record the administrator action.
+      const { error: auditError } = await supabaseAdmin
+        .from("admin_user_audit_logs")
+        .insert({
+          actor_id: actor.id,
+          target_user_id: target.id,
+          action: newStatus === "suspended"
+            ? "account_suspended"
+            : "account_activated",
+          details: {
+            actor_role: actor.user_role,
+            target_role: target.user_role,
+            previous_status: target.account_status,
+            new_status: newStatus,
+            target_lottery_id: target.lottery_id,
+          },
+        });
+
+      if (auditError) {
+        console.error("Account status audit error:", auditError);
+
+        return response({
+          success: true,
+          warning: "Account status changed, but audit log could not be saved",
+          user_id: updated.id,
+          account_status: updated.account_status,
+          audit_saved: false,
+        }, 200);
+      }
+
+      return response({
+        success: true,
+        message: `Account successfully ${newStatus}`,
+        user_id: updated.id,
+        account_status: updated.account_status,
+        changed: true,
+        audit_saved: true,
       });
     }
 
