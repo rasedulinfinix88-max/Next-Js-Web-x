@@ -31,6 +31,30 @@ function isUUID(value: unknown): value is string {
   );
 }
 
+function isValidDate(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(value)
+  ) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value
+  );
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0
+  );
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -355,13 +379,143 @@ Deno.serve(async (req: Request) => {
     }
 
     // =====================================
+    // ACTION 6: ADMIN CREATE DRAW
+    // =====================================
+
+    if (action === "admin_create_draw") {
+      const drawDate = body.draw_date;
+      const ticketPrice = body.ticket_price;
+      const prizeAmount = body.prize_amount;
+
+      const totalJackpot =
+        body.total_jackpot === undefined
+          ? 0
+          : body.total_jackpot;
+
+      if (!isValidDate(drawDate)) {
+        return response(400, {
+          success: false,
+          message: "A valid draw_date (YYYY-MM-DD) is required.",
+        });
+      }
+
+      if (!isPositiveNumber(ticketPrice)) {
+        return response(400, {
+          success: false,
+          message: "Ticket price must be greater than zero.",
+        });
+      }
+
+      if (!isPositiveNumber(prizeAmount)) {
+        return response(400, {
+          success: false,
+          message: "Prize amount must be greater than zero.",
+        });
+      }
+
+      if (
+        typeof totalJackpot !== "number" ||
+        !Number.isFinite(totalJackpot) ||
+        totalJackpot < 0
+      ) {
+        return response(400, {
+          success: false,
+          message: "Total jackpot cannot be negative.",
+        });
+      }
+
+      const { data, error } = await supabase.rpc(
+        "admin_create_ticket_draw",
+        {
+          p_draw_date: drawDate,
+          p_ticket_price: ticketPrice,
+          p_prize_amount: prizeAmount,
+          p_total_jackpot: totalJackpot,
+        },
+      );
+
+      if (error) {
+        console.error("Admin create draw RPC error:", error.message);
+
+        return response(400, {
+          success: false,
+          message: error.message || "Draw creation failed.",
+        });
+      }
+
+      return response(200, {
+        success: true,
+        message: "Draw created successfully.",
+        data,
+      });
+    }
+
+    // =====================================
+    // ACTION 7: ADMIN OPEN DRAW
+    // =====================================
+
+    if (action === "admin_open_draw") {
+      const drawId = body.draw_id;
+
+      if (!isUUID(drawId)) {
+        return response(400, {
+          success: false,
+          message: "A valid draw_id is required.",
+        });
+      }
+
+      const { data, error } = await supabase.rpc(
+        "admin_open_ticket_draw",
+        {
+          p_draw_id: drawId,
+        },
+      );
+
+      if (error) {
+        console.error("Admin open draw RPC error:", error.message);
+
+        return response(400, {
+          success: false,
+          message: error.message || "Could not open draw.",
+        });
+      }
+
+      return response(200, {
+        success: true,
+        message: "Draw opened successfully.",
+        data,
+      });
+    }
+
+    // =====================================
+    // ACTION 8: ADMIN LIST DRAWS
+    // =====================================
+
+    if (action === "admin_list_draws") {
+      const { data, error } = await supabase.rpc(
+        "admin_list_ticket_draws",
+      );
+
+      if (error) {
+        console.error("Admin list draws RPC error:", error.message);
+
+        return response(400, {
+          success: false,
+          message: "Could not retrieve admin draw list.",
+        });
+      }
+
+      return response(200, data);
+    }
+
+    // =====================================
     // INVALID ACTION
     // =====================================
 
     return response(400, {
       success: false,
       message:
-        "Invalid action. Supported actions: buy_ticket, my_tickets, verify_ticket, draw_status, admin_pick_winner.",
+        "Invalid action. Supported actions: buy_ticket, my_tickets, verify_ticket, draw_status, admin_pick_winner, admin_create_draw, admin_open_draw, admin_list_draws.",
     });
   } catch (error) {
     console.error("Ticket Manager error:", error);
