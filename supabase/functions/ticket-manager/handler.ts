@@ -318,13 +318,75 @@ Deno.serve(async (req: Request) => {
     }
 
     // =====================================
+    // ACTION 5: ADMIN PICK WINNER
+    // =====================================
+
+    if (action === "admin_pick_winner") {
+      const drawId = body.draw_id;
+
+      if (!isUUID(drawId)) {
+        return response(400, {
+          success: false,
+          message: "A valid draw_id is required.",
+        });
+      }
+
+      const { data, error } = await supabase.rpc(
+        "admin_pick_ticket_winner",
+        {
+          p_draw_id: drawId,
+        },
+      );
+
+      if (error) {
+        console.error("Admin winner selection RPC error:", error.message);
+
+        const message =
+          error.message || "Winner selection failed.";
+
+        const lowerMessage = message.toLowerCase();
+
+        const status =
+          lowerMessage.includes("super admin") ||
+          lowerMessage.includes("authentication")
+            ? 403
+            : 400;
+
+        return response(status, {
+          success: false,
+          message,
+        });
+      }
+
+      if (!data || data.success !== true) {
+        return response(500, {
+          success: false,
+          message: "Winner selection could not be confirmed.",
+        });
+      }
+
+      return response(200, {
+        success: true,
+        message: "Winner selected successfully.",
+        winner: {
+          draw_id: data.draw_id,
+          ticket_id: data.winning_ticket_id,
+          ticket_number: data.winning_ticket_number,
+          user_id: data.winner_user_id,
+          prize_amount: data.prize_amount,
+          result_status: data.result_status,
+        },
+      });
+    }
+
+    // =====================================
     // INVALID ACTION
     // =====================================
 
     return response(400, {
       success: false,
       message:
-        "Invalid action. Supported actions: buy_ticket, my_tickets, verify_ticket, draw_status.",
+        "Invalid action. Supported actions: buy_ticket, my_tickets, verify_ticket, draw_status, admin_pick_winner.",
     });
   } catch (error) {
     console.error("Ticket Manager error:", error);
