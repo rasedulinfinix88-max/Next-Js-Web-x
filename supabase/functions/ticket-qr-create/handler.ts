@@ -12,6 +12,7 @@ const corsHeaders = {
 function toBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((b) => (binary += String.fromCharCode(b)));
+
   return btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -53,6 +54,8 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("PROJECT_SERVICE_KEY");
 
     if (!projectUrl || !anonKey || !serviceKey) {
+      console.error("QR: Required environment variable is missing.");
+
       return json({
         success: false,
         message: "Server configuration error",
@@ -70,42 +73,74 @@ serve(async (req) => {
 
     const jwt = authorization.replace(/^Bearer\s+/i, "");
 
-    const authClient = createClient(projectUrl, anonKey);
+    const authClient = createClient(projectUrl, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
 
     const { data: authData, error: authError } =
       await authClient.auth.getUser(jwt);
 
     if (authError || !authData.user) {
+      console.error(
+        "QR authentication failed:",
+        authError?.message || "User not found",
+      );
+
       return json({
         success: false,
         message: "Unauthorized",
       }, 401);
     }
 
-    const { ticket_id } = await req.json();
+    const body = await req.json();
+    const ticket_id = body?.ticket_id;
 
-    if (typeof ticket_id !== "string" || !ticket_id) {
+    if (typeof ticket_id !== "string" || !ticket_id.trim()) {
       return json({
         success: false,
-        message: "Invalid ticket",
+        message: "Invalid ticket ID",
       }, 400);
     }
 
     const admin = createClient(projectUrl, serviceKey, {
-      auth: { persistSession: false },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     });
 
-    const { data: ticket, error } = await admin
+    const { data: ticket, error: ticketError } = await admin
       .from("ticket_purchases")
       .select("id")
       .eq("id", ticket_id)
       .eq("user_id", authData.user.id)
       .maybeSingle();
 
-    if (error || !ticket) {
+    // Database Error এবং Ticket Not Found আলাদা করা হয়েছে।
+    if (ticketError) {
+      console.error(
+        "QR ticket database query failed:",
+        ticketError.code,
+        ticketError.message,
+      );
+
       return json({
         success: false,
-        message: "Ticket not found",
+        message: "Ticket database query failed",
+      }, 500);
+    }
+
+    if (!ticket) {
+      console.error(
+        "QR ticket not found or ownership mismatch.",
+      );
+
+      return json({
+        success: false,
+        message: "Ticket not found for this account",
       }, 404);
     }
 
@@ -126,7 +161,9 @@ serve(async (req) => {
     );
 
     const encryptedBytes = new Uint8Array(encrypted);
-    const combined = new Uint8Array(iv.length + encryptedBytes.length);
+    const combined = new Uint8Array(
+      iv.length + encryptedBytes.length,
+    );
 
     combined.set(iv);
     combined.set(encryptedBytes, iv.length);
@@ -135,7 +172,12 @@ serve(async (req) => {
       success: true,
       token: toBase64Url(combined),
     });
-  } catch {
+  } catch (error) {
+    console.error(
+      "QR generation error:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+
     return json({
       success: false,
       message: "QR generation failed",
