@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
+import LotteryHeader from "../../components/Header/Header";
+import LotteryFooter from "../../components/Footer/Footer";
 
 type Winner = {
   ticket_id: string;
@@ -29,6 +31,8 @@ export default function WinnerSelectionPage() {
   const [error, setError] = useState("");
 
   const loadWinners = useCallback(async () => {
+    const startTime = Date.now();
+
     setLoading(true);
     setError("");
 
@@ -66,7 +70,12 @@ export default function WinnerSelectionPage() {
           : "Something went wrong."
       );
     } finally {
-      setLoading(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 3100 - elapsed);
+
+      window.setTimeout(() => {
+        setLoading(false);
+      }, remaining);
     }
   }, []);
 
@@ -93,7 +102,9 @@ export default function WinnerSelectionPage() {
     );
   };
 
-  const formatMoney = (amount: number | null | undefined) => {
+  const formatMoney = (
+    amount: number | null | undefined
+  ) => {
     return `৳${Number(amount || 0).toLocaleString("en-IN", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -102,77 +113,130 @@ export default function WinnerSelectionPage() {
 
   return (
     <main className="winner-page">
-      <div className="winner-container">
+      <LotteryHeader />
 
-        <header className="winner-header">
-          <div>
-            <div className="winner-label">LOTTERY RESULTS</div>
-            <h1>Winner List</h1>
-            <p>Congratulations to all our winners!</p>
+      {loading ? (
+        <div className="winner-loading">
+          <div className="loading-animation">
+            <svg
+              viewBox="0 0 180 160"
+              className="loading-svg"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="90"
+                cy="68"
+                r="48"
+                fill="none"
+                stroke="#294a36"
+                strokeWidth="6"
+              />
+
+              <circle
+                className="loading-ring"
+                cx="90"
+                cy="68"
+                r="48"
+                fill="none"
+                stroke="#49df91"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray="75 227"
+              />
+
+              <path
+                className="trophy-icon"
+                d="M65 37 H115 V56 C115 76 105 89 90 89 C75 89 65 76 65 56 Z"
+                fill="#f5c95c"
+              />
+
+              <path
+                d="M65 45 H52 V53 C52 68 60 74 74 75 M115 45 H128 V53 C128 68 120 74 106 75"
+                fill="none"
+                stroke="#f5c95c"
+                strokeWidth="6"
+                strokeLinecap="round"
+              />
+
+              <path
+                d="M90 89 V105 M73 109 H107 M78 105 H102"
+                stroke="#f5c95c"
+                strokeWidth="6"
+                strokeLinecap="round"
+              />
+
+              <path
+                d="M90 45 L95 55 L106 57 L98 65 L100 76 L90 70 L80 76 L82 65 L74 57 L85 55 Z"
+                fill="#ffffff"
+              />
+
+              <text
+                x="90"
+                y="139"
+                fill="#49df91"
+                fontSize="11"
+                textAnchor="middle"
+                fontWeight="bold"
+                letterSpacing="1.5"
+              >
+                WINNER LOADING
+              </text>
+            </svg>
           </div>
 
-          <button
-            className="refresh-button"
-            onClick={loadWinners}
-            disabled={loading}
-          >
-            {loading ? "LOADING..." : "↻ REFRESH"}
-          </button>
-        </header>
-
-        {loading && (
-          <div className="message-box">
-            Loading winner list...
+          <div className="loading-progress">
+            <div className="loading-progress-fill" />
           </div>
-        )}
 
-        {!loading && error && (
-          <div className="error-box">
-            <p>{error}</p>
-            <button onClick={loadWinners}>
-              TRY AGAIN
-            </button>
-          </div>
-        )}
+          <p className="loading-message">
+            Preparing Winner Results...
+          </p>
+        </div>
+      ) : (
+        <div className="winner-container">
 
-        {!loading && !error && draws.length === 0 && (
-          <div className="message-box">
-            No confirmed winners available yet.
-          </div>
-        )}
+          {error && (
+            <div className="error-box">
+              <p>{error}</p>
+              <button onClick={loadWinners}>
+                TRY AGAIN
+              </button>
+            </div>
+          )}
 
-        {!loading && !error && draws.map((draw) => (
-          <section
-            className="draw-card"
-            key={draw.draw_id}
-          >
-            <div className="draw-header">
-              <div>
-                <span className="draw-label">
-                  COMPLETED DRAW
-                </span>
-                <h2>{formatDate(draw.draw_date)}</h2>
+          {!error && draws.length === 0 && (
+            <div className="message-box">
+              No confirmed winners available yet.
+            </div>
+          )}
+
+          {!error && draws.map((draw) => (
+            <section
+              className="draw-card"
+              key={draw.draw_id}
+            >
+              <div className="draw-header">
+                <div>
+                  <span className="draw-label">
+                    COMPLETED DRAW
+                  </span>
+                  <h2>{formatDate(draw.draw_date)}</h2>
+                </div>
+
+                <div className="prize-pool">
+                  <span>PRIZE POOL</span>
+                  <strong>
+                    {formatMoney(draw.total_jackpot)}
+                  </strong>
+                </div>
               </div>
 
-              <div className="prize-pool">
-                <span>PRIZE POOL</span>
-                <strong>
-                  {formatMoney(draw.total_jackpot)}
-                </strong>
+              <div className="winner-table-header">
+                <span>WINNER</span>
+                <span>TICKET DETAILS</span>
               </div>
-            </div>
 
-            <div className="winner-table-header">
-              <span>WINNER</span>
-              <span>TICKET DETAILS</span>
-            </div>
-
-            {[...draw.winners]
-              .map((winner, index) => ({
-                winner,
-                index,
-              }))
-              .map(({ winner, index }) => (
+              {draw.winners.map((winner, index) => (
                 <div
                   className="winner-row"
                   key={winner.ticket_id || index}
@@ -211,73 +275,108 @@ export default function WinnerSelectionPage() {
                 </div>
               ))}
 
-            <div className="draw-footer">
-              Total Winners: {draw.winners.length}
-            </div>
-          </section>
-        ))}
+              <div className="draw-footer">
+                Total Winners: {draw.winners.length}
+              </div>
+            </section>
+          ))}
 
-        <footer className="winner-footer">
-          <span>LOTTERY</span>
-          <p>All completed draws and winners are displayed here.</p>
-        </footer>
+        </div>
+      )}
 
-      </div>
+      <LotteryFooter />
 
       <style jsx>{`
         .winner-page {
           min-height: 100vh;
           background: #101512;
           color: #ffffff;
-          padding: 24px 14px 45px;
+          padding-bottom: 85px;
           font-family: Arial, sans-serif;
         }
 
         .winner-container {
           max-width: 850px;
           margin: 0 auto;
+          padding: 22px 14px 30px;
         }
 
-        .winner-header {
+        .winner-loading {
+          min-height: 65vh;
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
           align-items: center;
-          gap: 12px;
-          margin-bottom: 25px;
+          justify-content: center;
+          padding: 25px;
         }
 
-        .winner-label {
-          color: #30c879;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 2px;
+        .loading-animation {
+          width: 180px;
+          height: 160px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .winner-header h1 {
-          font-size: 28px;
-          margin: 7px 0;
-          font-weight: 900;
+        .loading-svg {
+          width: 180px;
+          height: 160px;
+          overflow: visible;
         }
 
-        .winner-header p {
-          color: #9ba79f;
-          font-size: 13px;
-          margin: 0;
+        .loading-ring {
+          transform-origin: 90px 68px;
+          animation: rotate-ring 1s linear infinite;
         }
 
-        .refresh-button {
-          background: #1c3428;
-          color: #49dc91;
-          border: 1px solid #326b4b;
-          border-radius: 7px;
-          padding: 10px 12px;
-          font-size: 10px;
-          font-weight: 800;
-          white-space: nowrap;
+        .trophy-icon {
+          transform-origin: 90px 68px;
+          animation: trophy-pulse 1s ease-in-out infinite alternate;
         }
 
-        .refresh-button:disabled {
-          opacity: 0.5;
+        .loading-progress {
+          width: 190px;
+          height: 5px;
+          background: #26392e;
+          border-radius: 20px;
+          overflow: hidden;
+          margin-top: 15px;
+        }
+
+        .loading-progress-fill {
+          width: 0%;
+          height: 100%;
+          background: #49df91;
+          border-radius: 20px;
+          animation: progress-fill 3.1s linear forwards;
+        }
+
+        .loading-message {
+          margin-top: 17px;
+          color: #a9c5b3;
+          font-size: 12px;
+          letter-spacing: 0.5px;
+        }
+
+        @keyframes rotate-ring {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes trophy-pulse {
+          from {
+            transform: scale(0.94);
+          }
+          to {
+            transform: scale(1.06);
+          }
+        }
+
+        @keyframes progress-fill {
+          to {
+            width: 100%;
+          }
         }
 
         .draw-card {
@@ -450,22 +549,9 @@ export default function WinnerSelectionPage() {
           border-radius: 6px;
         }
 
-        .winner-footer {
-          text-align: center;
-          padding-top: 18px;
-          color: #78877e;
-          font-size: 11px;
-        }
-
-        .winner-footer span {
-          color: #45d58a;
-          font-weight: 900;
-          letter-spacing: 2px;
-        }
-
         @media (min-width: 600px) {
-          .winner-page {
-            padding: 35px 22px;
+          .winner-container {
+            padding: 30px 22px;
           }
 
           .winner-row {
@@ -480,4 +566,3 @@ export default function WinnerSelectionPage() {
     </main>
   );
 }
-
