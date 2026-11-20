@@ -20,10 +20,7 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function decodeBase64Url(value: string): Uint8Array {
-  const base64 = value
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
-
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
   const binary = atob(padded);
 
@@ -37,15 +34,13 @@ async function decryptToken(token: string, serviceKey: string) {
 
   const tokenBytes = decodeBase64Url(token);
 
-  if (tokenBytes.length <= 12 + 16) {
+  if (tokenBytes.length <= 28) {
     throw new Error("Invalid verification token.");
   }
 
-  // The first 12 bytes are the AES-GCM IV.
   const iv = tokenBytes.slice(0, 12);
   const encryptedData = tokenBytes.slice(12);
 
-  // Must match ticket-qr-create key derivation exactly.
   const keyMaterial = new TextEncoder().encode(
     "ticket-qr-v1:" + serviceKey
   );
@@ -66,8 +61,9 @@ async function decryptToken(token: string, serviceKey: string) {
     encryptedData
   );
 
-  const payloadText = new TextDecoder().decode(decrypted);
-  const payload = JSON.parse(payloadText);
+  const payload = JSON.parse(
+    new TextDecoder().decode(decrypted)
+  );
 
   if (
     payload?.v !== 1 ||
@@ -80,6 +76,33 @@ async function decryptToken(token: string, serviceKey: string) {
   return payload;
 }
 
+async function getPublicTicket(admin: any, ticket: any) {
+  const { data: draw, error: drawError } = await admin
+    .from("ticket_draws")
+    .select("draw_date")
+    .eq("id", ticket.draw_id)
+    .maybeSingle();
+
+  if (drawError) {
+    console.error(
+      "Public draw database query failed:",
+      drawError.code,
+      drawError.message
+    );
+
+    throw new Error("Draw information is temporarily unavailable.");
+  }
+
+  return {
+    ticket_number: String(ticket.ticket_number ?? ""),
+    draw_date: String(draw?.draw_date ?? ""),
+    purchase_status: String(ticket.purchase_status ?? "Unknown"),
+    winner_status: ticket.is_winner === true
+      ? "Winner"
+      : "Not Winner",
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -87,7 +110,11 @@ serve(async (req) => {
 
   if (req.method !== "POST") {
     return jsonResponse(
-      { success: false, valid: false, message: "Method not allowed." },
+      {
+        success: false,
+        valid: false,
+        message: "Method not allowed.",
+      },
       405
     );
   }
@@ -110,34 +137,16 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => null);
-    const token = body?.token;
 
-    if (typeof token !== "string" || !token) {
+    if (!body || typeof body !== "object") {
       return jsonResponse(
         {
           success: false,
           valid: false,
-          message: "Verification token is required.",
+          message: "Invalid request.",
         },
         400
       );
-    }
-
-    let payload;
-
-    try {
-      payload = await decryptToken(token, PROJECT_SERVICE_KEY);
-    } catch (error) {
-      console.error(
-        "Ticket token verification failed:",
-        error instanceof Error ? error.message : error
-      );
-
-      return jsonResponse({
-        success: false,
-        valid: false,
-        message: "Invalid or unverified ticket.",
-      });
     }
 
     const admin = createClient(
@@ -151,28 +160,104 @@ serve(async (req) => {
       }
     );
 
-    const { data: ticket, error: ticketError } = await admin
-      .from("ticket_purchases")
-      .select(
-        "id, draw_id, ticket_number, purchase_status, is_winner"
-      )
-      .eq("id", payload.ticket_id)
-      .maybeSingle();
+    let ticket: any = null;
 
-    if (ticketError) {
-      console.error(
-        "Public ticket database query failed:",
-        ticketError.code,
-        ticketError.message
-      );
+    // Method 1: QR Token verification
+    if (typeof body.token === "string" && body.token) {
+      let payload;
 
+      try {
+        payload = await decryptToken(
+          body.token,
+          PROJECT_SERVICE_KEY
+        );
+      } catch (error) {
+        console.error(
+          "Ticket token verification failed:",
+          error instanceof Error ? error.message : error
+        );
+
+        return jsonResponse({
+          success: false,
+          valid: false,
+          message: "Invalid or unverified ticket.",
+        });
+      }
+
+      const { data, error } = await admin
+        .from("ticket_purchases")
+        .select(
+          "id, draw_id, ticket_number, purchase_status, is_winner"
+        )
+        .eq("id", payload.ticket_id)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "QR ticket database query failed:",
+          error.code,
+          error.message
+        );
+
+        return jsonResponse(
+          {
+            success: false,
+            valid: false,
+            message: "Ticket verification is temporarily unavailable.",
+          },
+          500
+        );
+      }
+
+      ticket = data;
+    }
+
+    // Method 2: Manual Ticket Number verification
+    else if (typeof body.ticket_number === "string") {
+      const manualNumber = body.ticket_number.trim();
+
+      if (!manualNumber || manualNumber.length > 100) {
+        return jsonResponse({
+          success: false,
+          valid: false,
+          message: "Please enter a valid Ticket Number.",
+        });
+      }
+
+      const { data, error } = await admin
+        .from("ticket_purchases")
+        .select(
+          "id, draw_id, ticket_number, purchase_status, is_winner"
+        )
+        .eq("ticket_number", manualNumber)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          "Manual ticket database query failed:",
+          error.code,
+          error.message
+        );
+
+        return jsonResponse(
+          {
+            success: false,
+            valid: false,
+            message: "Ticket search is temporarily unavailable.",
+          },
+          500
+        );
+      }
+
+      ticket = data;
+    } else {
       return jsonResponse(
         {
           success: false,
           valid: false,
-          message: "Ticket verification is temporarily unavailable.",
+          message: "QR token or Ticket Number is required.",
         },
-        500
+        400
       );
     }
 
@@ -180,46 +265,16 @@ serve(async (req) => {
       return jsonResponse({
         success: false,
         valid: false,
-        message: "Ticket not found.",
+        message: "Invalid Ticket. Ticket not found.",
       });
     }
 
-    const { data: draw, error: drawError } = await admin
-      .from("ticket_draws")
-      .select("draw_date")
-      .eq("id", ticket.draw_id)
-      .maybeSingle();
-
-    if (drawError) {
-      console.error(
-        "Public draw database query failed:",
-        drawError.code,
-        drawError.message
-      );
-
-      return jsonResponse(
-        {
-          success: false,
-          valid: false,
-          message: "Draw information is temporarily unavailable.",
-        },
-        500
-      );
-    }
-
-    const winnerStatus = ticket.is_winner === true
-      ? "Winner"
-      : "Not Winner";
+    const publicTicket = await getPublicTicket(admin, ticket);
 
     return jsonResponse({
       success: true,
       valid: true,
-      ticket: {
-        ticket_number: String(ticket.ticket_number ?? ""),
-        draw_date: String(draw?.draw_date ?? ""),
-        purchase_status: String(ticket.purchase_status ?? "Unknown"),
-        winner_status: winnerStatus,
-      },
+      ticket: publicTicket,
     });
   } catch (error) {
     console.error(
@@ -231,7 +286,9 @@ serve(async (req) => {
       {
         success: false,
         valid: false,
-        message: "Ticket verification failed.",
+        message: error instanceof Error
+          ? error.message
+          : "Ticket verification failed.",
       },
       500
     );
