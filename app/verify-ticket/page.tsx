@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
 
@@ -17,9 +17,7 @@ function formatDrawDate(value: string) {
 
   const date = new Date(value + "T00:00:00");
 
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
+  if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("en-BD", {
     day: "2-digit",
@@ -32,67 +30,100 @@ function TicketVerificationContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(token));
+  const [searching, setSearching] = useState(false);
+  const [ticketNumber, setTicketNumber] = useState("");
   const [ticket, setTicket] = useState<VerifiedTicket | null>(null);
   const [error, setError] = useState("");
+
+  function applyVerifiedTicket(result: any) {
+    if (!result?.success || !result?.valid || !result?.ticket) {
+      throw new Error(result?.message || "Invalid Ticket. Ticket not found.");
+    }
+
+    setTicket({
+      ticket_number: String(result.ticket.ticket_number || ""),
+      draw_date: String(result.ticket.draw_date || ""),
+      purchase_status: String(result.ticket.purchase_status || "Unknown"),
+      winner_status: String(result.ticket.winner_status || "Unknown"),
+    });
+  }
 
   useEffect(() => {
     let active = true;
 
-    async function verifyTicket() {
+    async function verifyQrTicket() {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       setTicket(null);
 
       try {
-        if (!token) {
-          throw new Error("QR verification token is missing.");
-        }
-
         const { data, error: functionError } =
           await supabase.functions.invoke("ticket-verify-public", {
             body: { token },
           });
 
-        if (functionError) {
-          throw new Error(functionError.message);
-        }
+        if (functionError) throw new Error(functionError.message);
 
         const result = data?.data ?? data;
 
         if (!result?.success || !result?.valid || !result?.ticket) {
-          throw new Error("Invalid or unverified ticket.");
+          throw new Error(result?.message || "Invalid or unverified ticket.");
         }
 
-        if (!active) return;
-
-        setTicket({
-          ticket_number: String(result.ticket.ticket_number || ""),
-          draw_date: String(result.ticket.draw_date || ""),
-          purchase_status: String(
-            result.ticket.purchase_status || "Unknown"
-          ),
-          winner_status: String(
-            result.ticket.winner_status || "Unknown"
-          ),
-        });
+        if (active) applyVerifiedTicket(result);
       } catch (err: any) {
         if (active) {
-          setError(
-            err?.message || "Ticket verification failed."
-          );
+          setError(err?.message || "Ticket verification failed.");
         }
       } finally {
         if (active) setLoading(false);
       }
     }
 
-    verifyTicket();
+    verifyQrTicket();
 
     return () => {
       active = false;
     };
   }, [token]);
+
+  async function handleManualSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const cleanNumber = ticketNumber.trim();
+
+    if (!cleanNumber) {
+      setError("Please enter your Ticket Number.");
+      setTicket(null);
+      return;
+    }
+
+    setSearching(true);
+    setError("");
+    setTicket(null);
+
+    try {
+      const { data, error: functionError } =
+        await supabase.functions.invoke("ticket-verify-public", {
+          body: { ticket_number: cleanNumber },
+        });
+
+      if (functionError) throw new Error(functionError.message);
+
+      const result = data?.data ?? data;
+      applyVerifiedTicket(result);
+    } catch (err: any) {
+      setError(err?.message || "Ticket verification failed.");
+    } finally {
+      setSearching(false);
+    }
+  }
 
   return (
     <main
@@ -136,7 +167,60 @@ function TicketVerificationContent() {
           </p>
         </div>
 
-        {loading && (
+        {!token && !ticket && !loading && (
+          <form onSubmit={handleManualSearch} style={{ marginTop: 25 }}>
+            <p
+              style={{
+                color: "#b7c5bb",
+                fontSize: 13,
+                textAlign: "center",
+                marginBottom: 14,
+              }}
+            >
+              Enter your ticket number to verify its authenticity.
+            </p>
+
+            <input
+              type="text"
+              value={ticketNumber}
+              onChange={(event) => setTicketNumber(event.target.value)}
+              placeholder="Enter Ticket Number"
+              autoComplete="off"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "15px 13px",
+                borderRadius: 9,
+                border: "1px solid #42634d",
+                background: "#101a14",
+                color: "#fff",
+                fontSize: 15,
+                outline: "none",
+                marginBottom: 12,
+              }}
+            />
+
+            <button
+              type="submit"
+              disabled={searching}
+              style={{
+                width: "100%",
+                padding: 14,
+                border: "none",
+                borderRadius: 9,
+                background: searching ? "#477a50" : "#00E701",
+                color: "#102016",
+                fontSize: 15,
+                fontWeight: "bold",
+                cursor: searching ? "not-allowed" : "pointer",
+              }}
+            >
+              {searching ? "Searching..." : "SEARCH TICKET"}
+            </button>
+          </form>
+        )}
+
+        {(loading || searching) && (
           <div
             style={{
               textAlign: "center",
@@ -151,7 +235,7 @@ function TicketVerificationContent() {
           </div>
         )}
 
-        {!loading && error && (
+        {!loading && !searching && error && (
           <div
             style={{
               marginTop: 25,
@@ -178,10 +262,31 @@ function TicketVerificationContent() {
             >
               {error}
             </p>
+
+            {!token && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setTicket(null);
+                }}
+                style={{
+                  marginTop: 15,
+                  padding: "10px 18px",
+                  border: "1px solid #8a343d",
+                  borderRadius: 8,
+                  background: "transparent",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Try Again
+              </button>
+            )}
           </div>
         )}
 
-        {!loading && ticket && (
+        {!loading && !searching && ticket && (
           <div style={{ marginTop: 25 }}>
             <div
               style={{
@@ -252,6 +357,30 @@ function TicketVerificationContent() {
               This verification confirms the ticket information
               returned by the official system.
             </p>
+
+            {!token && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTicket(null);
+                  setTicketNumber("");
+                  setError("");
+                }}
+                style={{
+                  width: "100%",
+                  marginTop: 18,
+                  padding: 13,
+                  border: "1px solid #42634d",
+                  borderRadius: 9,
+                  background: "#101a14",
+                  color: "#00E701",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                VERIFY ANOTHER TICKET
+              </button>
+            )}
           </div>
         )}
       </section>
