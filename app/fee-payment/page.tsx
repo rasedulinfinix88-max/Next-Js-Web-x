@@ -1,338 +1,936 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
 import { useLanguage } from "../../lib/LanguageContext";
 import LotteryHeader from "../../components/Header/Header";
-import "./fee-payment.css";
+import LotteryFooter from "../../components/Footer/Footer";
+
+type FeeAssessment = {
+  id: string;
+  draw_id: string;
+  winning_amount: number;
+  fee_breakdown: Record<
+    string,
+    { fee_name: string; percentage: number; amount: number }
+  >;
+  total_fee_percentage: number;
+  total_fee_amount: number;
+  payment_status: string;
+};
+
+type PaymentMethod = {
+  id: string;
+  method_code: string;
+  method_name: string | null;
+  method_type: string | null;
+  account_name: string | null;
+  admin_payment_number: string | null;
+  wallet_address: string | null;
+  network: string | null;
+  method_logo_url: string | null;
+  instructions: string | null;
+  maintenance_message: string | null;
+  is_active: boolean | null;
+  is_deposit_enabled: boolean | null;
+};
+
+type FeePayment = {
+  id: string;
+  status: string;
+  submitted_amount: number;
+  payment_method_code: string;
+  sender_account: string;
+  transaction_id: string;
+  admin_note: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+};
+
+type Verification = {
+  identity_status: string;
+  payment_method_status: string;
+  identity_note: string | null;
+  payment_method_note: string | null;
+};
 
 export default function FeePaymentPage() {
   const router = useRouter();
   const { t } = useLanguage();
 
   const [profile, setProfile] = useState<any>(null);
-  const [settings, setSettings] = useState<any>(null);
+  const [assessment, setAssessment] = useState<FeeAssessment | null>(null);
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState("");
+  const [payment, setPayment] = useState<FeePayment | null>(null);
+  const [verification, setVerification] = useState<Verification | null>(null);
+
+  const [senderAccount, setSenderAccount] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+
   const [loading, setLoading] = useState(true);
-
-  const [trxId, setTrxId] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState({ type: "", text: "" });
-  const [copied, setCopied] = useState(false);
-  const [copiedAmount, setCopiedAmount] = useState(false);
-  
-  // Under Review স্টেট
-  const [isUnderReview, setIsUnderReview] = useState(false);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // ডাটা ফেচ এবং পেন্ডিং চেক
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-          if (profileData) {
-            if (profileData.is_lottery_fee_paid) {
-              router.replace("/Lottery/Secure-cashout-activity");
-              return;
-            }
-            setProfile(profileData);
-          }
-
-          // চেক করা হচ্ছে ইউজারের কোনো ফি পেমেন্ট কি পেন্ডিং আছে কি না
-          const { data: pendingTx } = await supabase
-            .from("ticket_transactions")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("transaction_type", "fee_payment")
-            .eq("status", "pending")
-            .limit(1);
-
-          if (pendingTx && pendingTx.length > 0) {
-            setIsUnderReview(true);
-          }
-        }
-        
-        const { data: settingsData } = await supabase.from("lottery_settings").select("*").eq("id", 1).single();
-        if (settingsData) setSettings(settingsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-
-    // ৩.১ সেকেন্ড লোডিং
-    const timer = new Promise((resolve) => setTimeout(resolve, 3100));
-    Promise.all([fetchData(), timer]).then(() => {
-      setLoading(false);
+  const money = (value: number | string) =>
+    Number(value || 0).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     });
 
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [router]);
+  const statusText = (status?: string) => {
+    const value = (status || "pending").toLowerCase();
 
-  // Under Review থাকাকালীন পোলিং (অটো চেক)
+    const labels: Record<string, [string, string]> = {
+      pending: ["Pending", "অপেক্ষমাণ"],
+      unpaid: ["Unpaid", "পরিশোধ হয়নি"],
+      under_review: ["Under Review", "পর্যালোচনাধীন"],
+      approved: ["Approved", "অনুমোদিত"],
+      rejected: ["Rejected", "বাতিল"],
+    };
+
+    const label = labels[value] || [value.replaceAll("_", " "), value];
+    return t(label[0], label[1]);
+  };
+
+  const loadPage = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        router.replace("/user/login");
+        return;
+      }
+
+      const { data: userProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select(
+          "id, full_name, user_mobile, lottery_id, balance, account_status, user_lottery_fee_paid, user_lottery_is_terms_accepted"
+        )
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        throw new Error(profileError?.message || "Profile not found");
+      }
+
+      setProfile(userProfile);
+
+      if (userProfile.account_status !== "active") {
+        throw new Error(
+          t(
+            "Your account is not active. Please contact support.",
+            "আপনার অ্যাকাউন্ট সক্রিয় নয়। Support-এর সঙ্গে যোগাযোগ করুন।"
+          )
+        );
+      }
+
+      if (userProfile.user_lottery_fee_paid === true) {
+        router.replace("/Client/Withdrawal");
+        return;
+      }
+
+      if (userProfile.user_lottery_is_terms_accepted !== true) {
+        router.replace("/withdraw-terms");
+        return;
+      }
+
+      // Find the latest published winning result belonging to this user.
+      const { data: winningResult, error: resultError } = await supabase
+        .from("ticket_draw_results")
+        .select("draw_id")
+        .eq("winner_user_id", user.id)
+        .eq("result_status", "published")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (resultError) {
+        throw new Error(resultError.message);
+      }
+
+      if (!winningResult?.draw_id) {
+        throw new Error(
+          t(
+            "No published winning result was found for your account.",
+            "আপনার অ্যাকাউন্টে কোনো Published Winning Result পাওয়া যায়নি।"
+          )
+        );
+      }
+
+      // Create or retrieve the existing fee assessment.
+      const { data: assessmentData, error: assessmentError } =
+        await supabase.rpc("user_create_lottery_fee_assessment", {
+          p_draw_id: winningResult.draw_id,
+        });
+
+      if (assessmentError) {
+        throw new Error(assessmentError.message);
+      }
+
+      if (!assessmentData) {
+        throw new Error("Fee assessment could not be loaded.");
+      }
+
+      const currentAssessment = assessmentData as FeeAssessment;
+      setAssessment(currentAssessment);
+
+      // Load active payment methods.
+      const { data: methodData, error: methodError } = await supabase
+        .from("control_payment_method")
+        .select(
+          "id, method_code, method_name, method_type, account_name, admin_payment_number, wallet_address, network, method_logo_url, instructions, maintenance_message, is_active, is_deposit_enabled"
+        )
+        .eq("is_active", true)
+        .eq("is_deposit_enabled", true)
+        .order("method_name", { ascending: true });
+
+      if (methodError) {
+        throw new Error(methodError.message);
+      }
+
+      const activeMethods = (methodData || []) as PaymentMethod[];
+      setMethods(activeMethods);
+
+      if (activeMethods.length > 0) {
+        setSelectedMethod(activeMethods[0].method_code);
+      }
+
+      // Load the latest payment submission for this assessment.
+      const { data: paymentData, error: paymentError } = await supabase
+        .from("lottery_fee_payments")
+        .select("*")
+        .eq("assessment_id", currentAssessment.id)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (paymentError) {
+        throw new Error(paymentError.message);
+      }
+
+      setPayment(paymentData as FeePayment | null);
+
+      // Load verification status.
+      const { data: verificationData, error: verificationError } =
+        await supabase
+          .from("lottery_verification_requests")
+          .select(
+            "identity_status, payment_method_status, identity_note, payment_method_note"
+          )
+          .eq("assessment_id", currentAssessment.id)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+      if (verificationError) {
+        throw new Error(verificationError.message);
+      }
+
+      setVerification(verificationData as Verification | null);
+    } catch (err: any) {
+      setError(
+        err?.message ||
+          t("Something went wrong.", "কোনো একটি সমস্যা হয়েছে।")
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (isUnderReview && profile) {
-      pollingRef.current = setInterval(async () => {
-        // চেক করা হচ্ছে ফি পেইড হয়েছে কি না
-        const { data: profileData } = await supabase.from("profiles").select("is_lottery_fee_paid").eq("id", profile.id).single();
-        
-        if (profileData?.is_lottery_fee_paid) {
-          if (pollingRef.current) clearInterval(pollingRef.current);
-          router.replace("/Lottery/Secure-cashout-activity");
-          return;
-        }
+    loadPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-        // চেক করা হচ্ছে পেমেন্ট রিজেক্ট হয়েছে কি না
-        const { data: txData } = await supabase
-          .from("ticket_transactions")
-          .select("status")
-          .eq("user_id", profile.id)
-          .eq("transaction_type", "fee_payment")
-          .order("created_at", { ascending: false })
-          .limit(1);
+  const currentMethod = methods.find(
+    (method) => method.method_code === selectedMethod
+  );
 
-        if (txData && txData.length > 0 && txData[0].status === "rejected") {
-           setIsUnderReview(false);
-           setMessage({ type: "error", text: t("Your payment was rejected. Please try again with a valid TrxID.", "আপনার পেমেন্টটি বাতিল করা হয়েছে। সঠিক TrxID দিয়ে আবার চেষ্টা করুন।") });
-           if (pollingRef.current) clearInterval(pollingRef.current);
-        }
-      }, 10000); // প্রতি ১০ সেকেন্ড পর পর চেক করবে
+  const hasActivePayment =
+    payment?.status === "pending" ||
+    payment?.status === "under_review" ||
+    payment?.status === "approved";
+
+  const submitPayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!assessment) {
+      setError(t("Fee assessment is missing.", "Fee Assessment পাওয়া যায়নি।"));
+      return;
     }
 
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [isUnderReview, profile, router, t]);
-
-
-  const copyNumber = () => {
-    if (settings?.fee_payment_number) {
-      navigator.clipboard.writeText(settings.fee_payment_number);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    if (!selectedMethod) {
+      setError(t("Please select a payment method.", "Payment Method নির্বাচন করুন।"));
+      return;
     }
-  };
 
-  // ফি ক্যালকুলেশন লজিক
-  const currentBalance = Number(profile?.lottery_balance || 0);
-  const mgmtPct = Number(settings?.management_fee_pct) || 0;
-  const srvcPct = Number(settings?.service_fee_pct) || 0;
-  const netPct = Number(settings?.network_fee_pct) || 0;
-  const vatPct = Number(settings?.vat_pct) || 0;
-  const gstPct = Number(settings?.gst_pct) || 0;
+    if (!senderAccount.trim() || !transactionId.trim()) {
+      setError(
+        t(
+          "Sender account and Transaction ID are required.",
+          "Sender Account এবং Transaction ID দিতে হবে।"
+        )
+      );
+      return;
+    }
 
-  const mgmtAmount = (currentBalance * mgmtPct) / 100;
-  const srvcAmount = (currentBalance * srvcPct) / 100;
-  const netAmount = (currentBalance * netPct) / 100;
-  const vatAmount = (currentBalance * vatPct) / 100;
-  const gstAmount = (currentBalance * gstPct) / 100;
-
-  const totalFeeAmount = mgmtAmount + srvcAmount + netAmount + vatAmount + gstAmount;
-
-  // অ্যামাউন্ট কপি লজিক
-  const copyAmountToClipboard = () => {
-    navigator.clipboard.writeText(totalFeeAmount.toFixed(2));
-    setCopiedAmount(true);
-    setTimeout(() => setCopiedAmount(false), 2000);
-  };
-
-  const handleSubmitFee = async () => {
-    if (trxId.length < 8) {
-      setMessage({ type: "error", text: t("Please enter a valid TrxID (Min 8 characters).", "সঠিক TrxID দিন (কমপক্ষে ৮ ডিজিট)।") });
+    if (hasActivePayment) {
+      setError(
+        t(
+          "An active payment submission already exists.",
+          "আপনার একটি Payment Submission ইতোমধ্যে Review-এ রয়েছে।"
+        )
+      );
       return;
     }
 
     setSubmitting(true);
-    setMessage({ type: "", text: "" });
 
     try {
-      const trackId = `FEE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      
-      const { error } = await supabase.from("ticket_transactions").insert({
-        user_id: profile.id,
-        ticket_dp_track_id: trackId,
-        transaction_type: "fee_payment",
-        amount: totalFeeAmount,
-        trx_id: trxId.toUpperCase(),
-        status: "pending",
-      });
+      const { data, error: submitError } = await supabase.rpc(
+        "user_submit_lottery_fee_payment",
+        {
+          p_assessment_id: assessment.id,
+          p_payment_method_code: selectedMethod,
+          p_sender_account: senderAccount.trim(),
+          p_transaction_id: transactionId.trim(),
+          p_submitted_amount: Number(assessment.total_fee_amount),
+        }
+      );
 
-      if (error) throw error;
+      if (submitError) {
+        throw new Error(submitError.message);
+      }
 
-      // সাবমিট সফল হলে Under Review স্টেট অন করা হবে
-      setIsUnderReview(true);
-      setTrxId("");
+      setPayment(data as FeePayment);
+      setSenderAccount("");
+      setTransactionId("");
+
+      setSuccess(
+        t(
+          "Your payment has been submitted successfully. It is now under review.",
+          "আপনার Payment সফলভাবে জমা হয়েছে। এটি এখন Review-এ রয়েছে।"
+        )
+      );
+
+      await loadPage();
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message });
+      setError(
+        err?.message ||
+          t("Payment submission failed.", "Payment জমা দেওয়া যায়নি।")
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  // মেইন লোডিং স্ক্রিন
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0d241e] flex flex-col items-center justify-center">
-        <svg className="w-12 h-12 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p className="text-white mt-4 font-bold tracking-widest animate-pulse text-[11px]">
-          VERIFYING FEE...
-        </p>
-      </div>
-    );
-  }
+  const cardStyle: React.CSSProperties = {
+    background: "#173d2c",
+    border: "1px solid #28553e",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+  };
 
-  // ==========================================
-  // Under Review ফুল স্ক্রিন UI (কার্ড ছাড়া, স্ক্রল বন্ধ)
-  // ==========================================
-  if (isUnderReview) {
-    return (
-      <div className="fee-payment-page h-screen flex flex-col overflow-hidden">
-        <LotteryHeader userProfile={profile} />
-        
-        {/* স্ক্রিনের মাঝখানে ফিক্সড থাকার জন্য flex-1 এবং justify-center */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-20">
-          
-          {/* Clock Icon */}
-          <div className="mb-6">
-            <svg className="w-24 h-24 text-[#A0ADB0]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          
-          <h3 className="text-2xl font-black text-white text-center mb-3">Under Review</h3>
-          <p className="text-white font-semibold text-lg text-center mb-2">
-            Payment Verification
-          </p>
-          <p className="text-[#A0ADB0] text-sm text-center mb-10">
-            Please Wait 1/2 Hours
-          </p>
-          
-          {/* Spinner */}
-          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      </div>
-    );
-  }
+  const mutedStyle: React.CSSProperties = {
+    color: "#a9c2b2",
+    fontSize: 13,
+  };
 
-  // ==========================================
-  // ফর্ম UI
-  // ==========================================
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    background: "#102d20",
+    color: "#ffffff",
+    border: "1px solid #41644f",
+    borderRadius: 8,
+    padding: "13px 12px",
+    fontSize: 14,
+    outline: "none",
+    marginTop: 7,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    color: "#e1eee5",
+    fontSize: 13,
+    fontWeight: 600,
+    marginTop: 15,
+  };
+
+  const statusColor = (status?: string) => {
+    if (status === "approved") return "#55d98a";
+    if (status === "rejected") return "#ff7777";
+    return "#f2c66d";
+  };
+
   return (
-    <div className="fee-payment-page">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0d2118",
+        color: "#ffffff",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <LotteryHeader userProfile={profile} />
 
-      <main className="fee-main">
-        <div className="fee-box">
-          <h3>{t("VAT & GST FEE", "ভ্যাট এবং জিএসটি ফি")}</h3>
-          <p className="fee-instruction">
-            {t("Send the exact amount to the number below to unlock your withdrawal.", "আপনার উত্তোলন আনলক করতে নিচের নাম্বারে সঠিক পরিমাণ পাঠান।")}
+      <main
+        style={{
+          width: "100%",
+          maxWidth: 650,
+          boxSizing: "border-box",
+          padding: "22px 14px 40px",
+          margin: "0 auto",
+        }}
+      >
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 23, margin: "0 0 7px", color: "#ffffff" }}>
+            {t("Lottery Fee Payment", "লটারি ফি পেমেন্ট")}
+          </h1>
+          <p style={{ ...mutedStyle, margin: 0 }}>
+            {t(
+              "Complete your fee payment and verification process.",
+              "আপনার Fee Payment এবং Verification প্রক্রিয়া সম্পন্ন করুন।"
+            )}
           </p>
+        </div>
 
-          <div className="number-copy-box">
-            <div className="flex items-center gap-2">
-               <img 
-                 src="https://i.ibb.co.com/ynRH1K3z/file-00000000ee6482089b62b469990f602a.png" 
-                 alt="bKash" 
-                 className="bkash-logo" 
-               />
-               <span>{settings?.fee_payment_number}</span>
-            </div>
-            <button onClick={copyNumber} className="copy-btn">
-              {copied ? t("Copied!", "কপি!") : t("Copy", "কপি")}
+        {loading && (
+          <div style={cardStyle}>
+            {t("Loading your fee details...", "আপনার Fee তথ্য লোড হচ্ছে...")}
+          </div>
+        )}
+
+        {!loading && error && !assessment && (
+          <div
+            style={{
+              ...cardStyle,
+              color: "#ffaaaa",
+              borderColor: "#8b4545",
+            }}
+          >
+            {error}
+            <button
+              type="button"
+              onClick={loadPage}
+              style={{
+                display: "block",
+                marginTop: 14,
+                padding: "10px 16px",
+                border: 0,
+                borderRadius: 7,
+                background: "#2b8151",
+                color: "#fff",
+                fontWeight: 700,
+              }}
+            >
+              {t("Try Again", "আবার চেষ্টা করুন")}
             </button>
           </div>
+        )}
 
-          <div className="fee-table">
-            {mgmtPct > 0 && (
-              <div className="fee-row">
-                <span>{t("Management Fee", "ম্যানেজমেন্ট ফি")} ({mgmtPct}%)</span>
-                <span>৳ {mgmtAmount.toFixed(2)}</span>
+        {!loading && assessment && (
+          <>
+            {error && (
+              <div
+                style={{
+                  ...cardStyle,
+                  color: "#ffaaaa",
+                  borderColor: "#8b4545",
+                }}
+              >
+                {error}
               </div>
             )}
-            {srvcPct > 0 && (
-              <div className="fee-row">
-                <span>{t("Service Fee", "সার্ভিস ফি")} ({srvcPct}%)</span>
-                <span>৳ {srvcAmount.toFixed(2)}</span>
+
+            {success && (
+              <div
+                style={{
+                  ...cardStyle,
+                  color: "#8df0ae",
+                  borderColor: "#367d50",
+                }}
+              >
+                {success}
               </div>
             )}
-            {netPct > 0 && (
-              <div className="fee-row">
-                <span>{t("Network Fee", "নেটওয়ার্ক ফি")} ({netPct}%)</span>
-                <span>৳ {netAmount.toFixed(2)}</span>
+
+            <section style={cardStyle}>
+              <h2 style={{ fontSize: 17, margin: "0 0 14px" }}>
+                {t("Winner Information", "বিজয়ীর তথ্য")}
+              </h2>
+
+              <div style={{ display: "grid", gap: 9 }}>
+                <div>
+                  <span style={mutedStyle}>
+                    {t("Full Name", "সম্পূর্ণ নাম")}
+                  </span>
+                  <div>{profile?.full_name || "—"}</div>
+                </div>
+
+                <div>
+                  <span style={mutedStyle}>
+                    {t("Lottery ID", "লটারি আইডি")}
+                  </span>
+                  <div>{profile?.lottery_id || "—"}</div>
+                </div>
+
+                <div>
+                  <span style={mutedStyle}>
+                    {t("Mobile Number", "মোবাইল নম্বর")}
+                  </span>
+                  <div>{profile?.user_mobile || "—"}</div>
+                </div>
+
+                <div>
+                  <span style={mutedStyle}>
+                    {t("Winning Amount", "জয়ের পরিমাণ")}
+                  </span>
+                  <div style={{ fontSize: 20, fontWeight: 700 }}>
+                    ৳ {money(assessment.winning_amount)}
+                  </div>
+                </div>
               </div>
-            )}
-            {vatPct > 0 && (
-              <div className="fee-row">
-                <span>{t("VAT", "ভ্যাট")} ({vatPct}%)</span>
-                <span>৳ {vatAmount.toFixed(2)}</span>
+            </section>
+
+            <section style={cardStyle}>
+              <h2 style={{ fontSize: 17, margin: "0 0 14px" }}>
+                {t("Fee Breakdown", "ফি-এর বিস্তারিত হিসাব")}
+              </h2>
+
+              {Object.entries(assessment.fee_breakdown || {}).map(
+                ([code, fee]) => (
+                  <div
+                    key={code}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 0",
+                      borderBottom: "1px solid #315541",
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13 }}>
+                        {fee.fee_name || code}
+                      </div>
+                      <div style={mutedStyle}>
+                        {Number(fee.percentage || 0)}%
+                      </div>
+                    </div>
+                    <strong style={{ whiteSpace: "nowrap" }}>
+                      ৳ {money(fee.amount)}
+                    </strong>
+                  </div>
+                )
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginTop: 16,
+                  fontSize: 14,
+                }}
+              >
+                <span>{t("Total Fee Percentage", "মোট ফি-এর হার")}</span>
+                <strong>{assessment.total_fee_percentage}%</strong>
               </div>
-            )}
-            {gstPct > 0 && (
-              <div className="fee-row">
-                <span>{t("GST", "জিএসটি")} ({gstPct}%)</span>
-                <span>৳ {gstAmount.toFixed(2)}</span>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginTop: 12,
+                  color: "#7af0a3",
+                  fontSize: 18,
+                }}
+              >
+                <strong>{t("Total Fee Amount", "মোট ফি-এর পরিমাণ")}</strong>
+                <strong>৳ {money(assessment.total_fee_amount)}</strong>
               </div>
+
+              <p style={{ ...mutedStyle, margin: "14px 0 0" }}>
+                {t(
+                  "This fee is paid separately. It is not deducted from your lottery winning amount.",
+                  "এই ফি আলাদাভাবে পরিশোধ করতে হবে। এটি আপনার Lottery Winning Amount থেকে কাটা হবে না।"
+                )}
+              </p>
+            </section>
+
+            <section style={cardStyle}>
+              <h2 style={{ fontSize: 17, margin: "0 0 12px" }}>
+                {t("Verification Status", "ভেরিফিকেশন স্ট্যাটাস")}
+              </h2>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginBottom: 12,
+                }}
+              >
+                <span>{t("Identity Verification", "পরিচয় যাচাই")}</span>
+                <strong
+                  style={{
+                    color: statusColor(verification?.identity_status),
+                  }}
+                >
+                  {statusText(verification?.identity_status)}
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <span>
+                  {t("Payment Method Verification", "পেমেন্ট মাধ্যম যাচাই")}
+                </span>
+                <strong
+                  style={{
+                    color: statusColor(
+                      verification?.payment_method_status
+                    ),
+                  }}
+                >
+                  {statusText(verification?.payment_method_status)}
+                </strong>
+              </div>
+
+              {verification?.identity_note && (
+                <p style={mutedStyle}>
+                  {t("Identity Note", "পরিচয় সংক্রান্ত নোট")}:{" "}
+                  {verification.identity_note}
+                </p>
+              )}
+
+              {verification?.payment_method_note && (
+                <p style={mutedStyle}>
+                  {t("Payment Method Note", "পেমেন্ট মাধ্যমের নোট")}:{" "}
+                  {verification.payment_method_note}
+                </p>
+              )}
+
+              <p style={{ ...mutedStyle, marginBottom: 0 }}>
+                {t(
+                  "Your payment details and verification statuses will be reviewed by Super Admin.",
+                  "আপনার Payment Details এবং Verification Status Super Admin পর্যালোচনা করবেন।"
+                )}
+              </p>
+            </section>
+
+            {payment?.status === "approved" && (
+              <section
+                style={{
+                  ...cardStyle,
+                  borderColor: "#367d50",
+                  color: "#8df0ae",
+                }}
+              >
+                <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
+                  {t("Payment Approved", "পেমেন্ট অনুমোদিত")}
+                </h2>
+                {t(
+                  "Your payment has been approved. Verification approval may still be required before withdrawal access is granted.",
+                  "আপনার পেমেন্ট অনুমোদিত হয়েছে। Withdrawal Access পাওয়ার আগে Verification Approval প্রয়োজন হতে পারে।"
+                )}
+              </section>
             )}
-            
-            <div className="fee-row">
-              <span>{t("Total Payable", "মোট প্রদেয়")}</span>
-              <div className="flex items-center">
-                <span className="text-white font-bold text-[18px]">৳ {totalFeeAmount.toFixed(2)}</span>
-                <button onClick={copyAmountToClipboard} className="copy-amount-btn" title="Copy Amount">
-                  {copiedAmount ? (
-                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                       <polyline points="20 6 9 17 4 12"></polyline>
-                     </svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
+
+            {payment?.status === "rejected" && (
+              <section
+                style={{
+                  ...cardStyle,
+                  borderColor: "#8b4545",
+                  color: "#ffaaaa",
+                }}
+              >
+                <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
+                  {t("Payment Rejected", "পেমেন্ট বাতিল হয়েছে")}
+                </h2>
+                <p style={{ margin: 0 }}>
+                  {payment.rejection_reason ||
+                    t("No rejection reason provided.", "কোনো কারণ উল্লেখ করা হয়নি।")}
+                </p>
+                <p style={{ ...mutedStyle, marginBottom: 0 }}>
+                  {t(
+                    "You may submit a new payment after correcting the issue.",
+                    "সমস্যা সংশোধন করে নতুন Payment জমা দিতে পারবেন।"
                   )}
-                </button>
-              </div>
-            </div>
-          </div>
+                </p>
+              </section>
+            )}
 
-          <div className="input-group">
-            <label>{t("Transaction ID (TrxID) *", "ট্রানজেকশন আইডি (TrxID) *")}</label>
-            <input 
-              type="text"
-              value={trxId}
-              onChange={(e) => setTrxId(e.target.value)}
-              placeholder={t("Enter TrxID here", "এখানে TrxID দিন")}
-              className="input-field"
-              disabled={submitting}
-            />
-          </div>
+            {payment?.status === "under_review" && (
+              <section
+                style={{
+                  ...cardStyle,
+                  borderColor: "#8b7139",
+                  color: "#f2d58c",
+                }}
+              >
+                <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
+                  {t("UNDER REVIEW", "পর্যালোচনাধীন")}
+                </h2>
+                <p style={{ margin: "0 0 8px" }}>
+                  {t(
+                    "Approximately 24 Hours For Method Verification",
+                    "পেমেন্ট মাধ্যম যাচাই করতে আনুমানিক ২৪ ঘণ্টা"
+                  )}
+                </p>
+                <p style={{ ...mutedStyle, margin: 0 }}>
+                  {t(
+                    "Your payment and withdrawal method are being verified. Please wait for Super Admin approval.",
+                    "আপনার Payment এবং Withdrawal Method যাচাই করা হচ্ছে। Super Admin-এর অনুমোদনের জন্য অপেক্ষা করুন।"
+                  )}
+                </p>
+              </section>
+            )}
 
-          {message.text && <div className={`msg-box ${message.type}`}>{message.text}</div>}
-        </div>
+            {!hasActivePayment && payment?.status !== "approved" && (
+              <section style={cardStyle}>
+                <h2 style={{ fontSize: 17, margin: "0 0 8px" }}>
+                  {t("Submit Fee Payment", "Fee Payment জমা দিন")}
+                </h2>
+
+                {methods.length === 0 ? (
+                  <p style={{ color: "#f2c66d", fontSize: 14 }}>
+                    {t(
+                      "No active payment method is available right now.",
+                      "এই মুহূর্তে কোনো Active Payment Method পাওয়া যাচ্ছে না।"
+                    )}
+                  </p>
+                ) : (
+                  <form onSubmit={submitPayment}>
+                    <label style={labelStyle}>
+                      {t("Select Payment Method", "Payment Method নির্বাচন করুন")}
+                    </label>
+
+                    <select
+                      value={selectedMethod}
+                      onChange={(event) =>
+                        setSelectedMethod(event.target.value)
+                      }
+                      style={inputStyle}
+                      required
+                    >
+                      {methods.map((method) => (
+                        <option
+                          key={method.id}
+                          value={method.method_code}
+                        >
+                          {method.method_name || method.method_code}
+                        </option>
+                      ))}
+                    </select>
+
+                    {currentMethod && (
+                      <div
+                        style={{
+                          background: "#102d20",
+                          border: "1px solid #41644f",
+                          borderRadius: 9,
+                          padding: 13,
+                          marginTop: 13,
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, marginBottom: 9 }}>
+                          {currentMethod.method_name ||
+                            currentMethod.method_code}
+                        </div>
+
+                        {currentMethod.account_name && (
+                          <p style={{ ...mutedStyle, margin: "6px 0" }}>
+                            {t("Account Name", "অ্যাকাউন্টের নাম")}:{" "}
+                            <strong style={{ color: "#fff" }}>
+                              {currentMethod.account_name}
+                            </strong>
+                          </p>
+                        )}
+
+                        {currentMethod.admin_payment_number && (
+                          <p style={{ ...mutedStyle, margin: "6px 0" }}>
+                            {t("Payment Number", "পেমেন্ট নম্বর")}:{" "}
+                            <strong style={{ color: "#fff" }}>
+                              {currentMethod.admin_payment_number}
+                            </strong>
+                          </p>
+                        )}
+
+                        {currentMethod.wallet_address && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={mutedStyle}>
+                              {t("Wallet Address", "ওয়ালেট অ্যাড্রেস")}
+                            </div>
+                            <div
+                              style={{
+                                color: "#fff",
+                                fontSize: 13,
+                                wordBreak: "break-all",
+                              }}
+                            >
+                              {currentMethod.wallet_address}
+                            </div>
+                          </div>
+                        )}
+
+                        {currentMethod.network && (
+                          <p style={{ ...mutedStyle, margin: "8px 0" }}>
+                            {t("Network", "নেটওয়ার্ক")}:{" "}
+                            <strong style={{ color: "#fff" }}>
+                              {currentMethod.network}
+                            </strong>
+                          </p>
+                        )}
+
+                        {currentMethod.instructions && (
+                          <p
+                            style={{
+                              color: "#d5e6da",
+                              fontSize: 13,
+                              whiteSpace: "pre-wrap",
+                              marginBottom: 0,
+                            }}
+                          >
+                            {currentMethod.instructions}
+                          </p>
+                        )}
+
+                        {currentMethod.maintenance_message && (
+                          <p
+                            style={{
+                              color: "#f2c66d",
+                              fontSize: 13,
+                              marginBottom: 0,
+                            }}
+                          >
+                            {currentMethod.maintenance_message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <label style={labelStyle}>
+                      {t("Fee Amount", "Fee-এর পরিমাণ")}
+                    </label>
+                    <input
+                      type="text"
+                      value={`৳ ${money(assessment.total_fee_amount)}`}
+                      readOnly
+                      style={{
+                        ...inputStyle,
+                        color: "#7af0a3",
+                        fontWeight: 700,
+                      }}
+                    />
+
+                    <label style={labelStyle}>
+                      {t("Sender Account", "যে Account থেকে পাঠিয়েছেন")}
+                    </label>
+                    <input
+                      type="text"
+                      value={senderAccount}
+                      onChange={(event) =>
+                        setSenderAccount(event.target.value)
+                      }
+                      placeholder={t(
+                        "Enter sender account number or wallet",
+                        "Sender Account Number বা Wallet লিখুন"
+                      )}
+                      style={inputStyle}
+                      required
+                    />
+
+                    <label style={labelStyle}>
+                      {t("Transaction ID", "Transaction ID")}
+                    </label>
+                    <input
+                      type="text"
+                      value={transactionId}
+                      onChange={(event) =>
+                        setTransactionId(event.target.value)
+                      }
+                      placeholder={t(
+                        "Enter transaction ID",
+                        "Transaction ID লিখুন"
+                      )}
+                      style={inputStyle}
+                      required
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={submitting || !currentMethod}
+                      style={{
+                        width: "100%",
+                        marginTop: 20,
+                        padding: 14,
+                        border: 0,
+                        borderRadius: 8,
+                        background:
+                          submitting || !currentMethod
+                            ? "#53665a"
+                            : "#21a45d",
+                        color: "#fff",
+                        fontSize: 15,
+                        fontWeight: 700,
+                        cursor:
+                          submitting || !currentMethod
+                            ? "not-allowed"
+                            : "pointer",
+                      }}
+                    >
+                      {submitting
+                        ? t("Submitting...", "জমা হচ্ছে...")
+                        : t("Submit Payment", "Payment জমা দিন")}
+                    </button>
+                  </form>
+                )}
+              </section>
+            )}
+
+            <section
+              style={{
+                ...cardStyle,
+                borderColor: "#8b7139",
+                background: "#282719",
+              }}
+            >
+              <h3 style={{ margin: "0 0 8px", fontSize: 15, color: "#f2d58c" }}>
+                {t("Important Notice", "গুরুত্বপূর্ণ নোটিশ")}
+              </h3>
+              <p style={{ ...mutedStyle, margin: 0 }}>
+                {t(
+                  "Withdrawal access will be available only after fee payment, identity verification, payment method verification and Super Admin approval.",
+                  "Fee Payment, পরিচয় যাচাই, Payment Method Verification এবং Super Admin Approval সম্পন্ন হওয়ার পরই Withdrawal Access দেওয়া হবে।"
+                )}
+              </p>
+            </section>
+          </>
+        )}
       </main>
 
-      <div className="submit-btn-wrapper">
-        <button 
-          onClick={handleSubmitFee} 
-          disabled={submitting || !trxId || totalFeeAmount <= 0}
-          className="submit-btn flex justify-center items-center gap-2"
-        >
-          {submitting ? (
-            <>
-              <svg className="w-5 h-5 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {t("Processing...", "প্রসেসিং...")}
-            </>
-          ) : (
-            t("Pay Fee", "ফি পরিশোধ করুন")
-          )}
-        </button>
-      </div>
+      <LotteryFooter />
     </div>
   );
 }
