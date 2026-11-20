@@ -157,10 +157,15 @@ export default function ProfilePage() {
         throw new Error("Full name is required.");
       }
 
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData.user) throw new Error("Please log in again.");
+      const { data: authData, error: authError } =
+        await supabase.auth.getUser();
 
-      const { error: updateError } = await supabase
+      if (authError) throw authError;
+      if (!authData.user) {
+        throw new Error("Please log in again.");
+      }
+
+      const { data: updatedRows, error: updateError } = await supabase
         .from("profiles")
         .update({
           full_name: fullName.trim(),
@@ -170,9 +175,21 @@ export default function ProfilePage() {
           user_address_store: fullAddress.trim() || null,
           update_at: new Date().toISOString(),
         })
-        .eq("id", authData.user.id);
+        .eq("id", authData.user.id)
+        .select("id");
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Profile update database error:", updateError);
+        throw new Error(
+          `Database update error: ${updateError.message} (Code: ${updateError.code || "unknown"})`
+        );
+      }
+
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(
+          "No profile row was updated. Please check your UPDATE policy and profile ID."
+        );
+      }
 
       const { data: updated, error: refreshError } = await supabase
         .from("profiles")
@@ -182,16 +199,34 @@ export default function ProfilePage() {
         .eq("id", authData.user.id)
         .single();
 
-      if (refreshError) throw refreshError;
+      if (refreshError) {
+        console.error("Profile refresh error:", refreshError);
+        throw new Error(
+          `Update succeeded, but profile refresh failed: ${refreshError.message} (Code: ${refreshError.code || "unknown"})`
+        );
+      }
+
+      if (!updated) {
+        throw new Error("Update succeeded, but refreshed profile was not found.");
+      }
 
       setProfile(updated as Profile);
       fillForm(updated as Profile);
       setEditing(false);
       setMessage("Profile updated successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Profile update failed."
-      );
+      console.error("Profile save error:", err);
+
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" &&
+              err !== null &&
+              "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Unknown profile update error.";
+
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -637,4 +672,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
