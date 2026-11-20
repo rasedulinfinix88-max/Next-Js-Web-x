@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import QRCode from "qrcode";
 import { supabase } from "../../../lib/supabase/client";
 import { useLanguage } from "../../../lib/LanguageContext";
 import LotteryHeader from "../../../components/Header/Header";
@@ -103,8 +104,68 @@ function TicketBuyContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+
   // একই Purchase-এর Retry হলে একই Request ID ব্যবহার হবে।
   const pendingRequestId = useRef<string | null>(null);
+
+  // নতুন QR তৈরি করার আলাদা Function
+  const generateTicketQr = async (ticketId: string) => {
+    if (!ticketId || qrLoading) return;
+
+    setQrLoading(true);
+    setQrError("");
+    setQrDataUrl("");
+
+    try {
+      const { data, error: functionError } =
+        await supabase.functions.invoke("ticket-qr-create", {
+          body: {
+            ticket_id: ticketId,
+          },
+        });
+
+      if (functionError) {
+        throw new Error(functionError.message);
+      }
+
+      const result = unwrapResponse(data);
+      const token = result?.token;
+
+      if (!result?.success || !token) {
+        throw new Error(
+          result?.message || "QR token could not be generated."
+        );
+      }
+
+      // GitHub Pages Base Path
+      const verificationUrl = new URL(
+        "/Next-Js-Web-x/verify-ticket/",
+        window.location.origin
+      );
+
+      verificationUrl.searchParams.set("token", token);
+
+      const qrImage = await QRCode.toDataURL(
+        verificationUrl.toString(),
+        {
+          width: 260,
+          margin: 2,
+          errorCorrectionLevel: "M",
+        }
+      );
+
+      setQrDataUrl(qrImage);
+    } catch (err: any) {
+      setQrError(
+        err?.message || "QR generation failed. Please try again."
+      );
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -182,16 +243,11 @@ function TicketBuyContent() {
 
         const drawResponseData = unwrapResponse(drawResponse);
 
-        // RPC-এর আসল Response Format:
-        // { success: true, draw: { draw_id, ... } }
         const drawData =
           drawResponseData?.draw ||
           drawResponseData;
 
-        if (
-          !drawData ||
-          !drawData.draw_id
-        ) {
+        if (!drawData || !drawData.draw_id) {
           throw new Error(
             drawResponseData?.message ||
             t(
@@ -238,6 +294,8 @@ function TicketBuyContent() {
 
     setError("");
     setSuccess("");
+    setQrError("");
+    setQrDataUrl("");
 
     if (draw.status !== "open") {
       setError(
@@ -299,7 +357,6 @@ function TicketBuyContent() {
       }
 
       const result = unwrapResponse(response);
-
       const ticketData = result?.ticket || result;
 
       const ticketNumber =
@@ -316,7 +373,7 @@ function TicketBuyContent() {
         );
       }
 
-      setTicket({
+      const purchasedTicket: PurchasedTicket = {
         id: ticketData?.id || "",
         number: String(ticketNumber),
         draw_id: ticketData?.draw_id || drawId,
@@ -325,7 +382,9 @@ function TicketBuyContent() {
           ticketData?.price ||
           draw.ticket_price
         ),
-      });
+      };
+
+      setTicket(purchasedTicket);
 
       const walletData = result?.wallet || {};
 
@@ -368,6 +427,16 @@ function TicketBuyContent() {
           "অভিনন্দন! আপনার Ticket সফলভাবে কেনা হয়েছে।"
         )
       );
+
+      // QR তৈরি আলাদা কাজ।
+      // QR ব্যর্থ হলেও Purchase সফল থাকবে।
+      if (purchasedTicket.id) {
+        void generateTicketQr(purchasedTicket.id);
+      } else {
+        setQrError(
+          "Ticket ID was not returned. Please contact support."
+        );
+      }
     } catch (err: any) {
       setError(
         err?.message ||
@@ -413,7 +482,10 @@ function TicketBuyContent() {
           </div>
 
           <p>
-            {t("Loading Ticket Information...", "Ticket Information লোড হচ্ছে...")}
+            {t(
+              "Loading Ticket Information...",
+              "Ticket Information লোড হচ্ছে..."
+            )}
           </p>
         </div>
       </div>
@@ -567,6 +639,86 @@ function TicketBuyContent() {
                     >
                       {ticket.number}
                     </p>
+
+                    <div
+                      style={{
+                        marginTop: 20,
+                        padding: 18,
+                        background: "#17231d",
+                        border: "1px solid #315b40",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <h3
+                        style={{
+                          color: "#fff",
+                          marginBottom: 14,
+                        }}
+                      >
+                        {t("Ticket Verification QR", "টিকিট যাচাই QR")}
+                      </h3>
+
+                      {qrLoading && (
+                        <p style={{ color: "#ddd" }}>
+                          {t("Generating QR Code...", "QR Code তৈরি হচ্ছে...")}
+                        </p>
+                      )}
+
+                      {qrDataUrl && (
+                        <>
+                          <img
+                            src={qrDataUrl}
+                            alt="Ticket Verification QR Code"
+                            style={{
+                              display: "block",
+                              width: 220,
+                              maxWidth: "100%",
+                              height: "auto",
+                              margin: "0 auto",
+                              padding: 8,
+                              background: "#fff",
+                              borderRadius: 8,
+                            }}
+                          />
+
+                          <p
+                            style={{
+                              color: "#00E701",
+                              fontSize: 12,
+                              marginTop: 12,
+                            }}
+                          >
+                            {t(
+                              "Scan this QR code to verify your ticket.",
+                              "টিকিট যাচাই করতে এই QR Code স্ক্যান করুন।"
+                            )}
+                          </p>
+                        </>
+                      )}
+
+                      {qrError && (
+                        <p
+                          style={{
+                            color: "#ff7777",
+                            fontSize: 13,
+                            marginTop: 10,
+                          }}
+                        >
+                          {qrError}
+                        </p>
+                      )}
+
+                      {!qrDataUrl && !qrLoading && ticket.id && (
+                        <button
+                          type="button"
+                          className="action-btn"
+                          onClick={() => generateTicketQr(ticket.id)}
+                          style={{ marginTop: 12 }}
+                        >
+                          {t("Generate QR Again", "আবার QR তৈরি করুন")}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
