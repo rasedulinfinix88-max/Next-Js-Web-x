@@ -25,7 +25,7 @@ const supabaseAdmin = createClient(
   }
 );
 
-// User JWT সহ RPC client তৈরি
+// User JWT সহ RPC client
 function createUserRpcClient(token: string) {
   return createClient(
     supabaseUrl,
@@ -538,9 +538,8 @@ serve(async (req) => {
 
       const trackingId = await generateTrackingId();
 
-      // User JWT is passed to the secure RPC.
-      // The RPC checks terms, fee payment and verification,
-      // then calls the existing atomic withdrawal function.
+      // Secure RPC: user JWT দিয়ে auth.uid() যাচাই হবে।
+      // Fee, terms এবং verification শর্ত SQL function যাচাই করবে।
 
       const userToken = getBearerToken(req);
 
