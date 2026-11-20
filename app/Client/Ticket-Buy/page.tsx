@@ -180,10 +180,20 @@ function TicketBuyContent() {
           );
         }
 
-        const drawData = unwrapResponse(drawResponse);
+        const drawResponseData = unwrapResponse(drawResponse);
 
-        if (!drawData || !drawData.draw_id) {
+        // RPC-এর আসল Response Format:
+        // { success: true, draw: { draw_id, ... } }
+        const drawData =
+          drawResponseData?.draw ||
+          drawResponseData;
+
+        if (
+          !drawData ||
+          !drawData.draw_id
+        ) {
           throw new Error(
+            drawResponseData?.message ||
             t(
               "Draw information was not found.",
               "এই Draw-এর তথ্য পাওয়া যায়নি।"
