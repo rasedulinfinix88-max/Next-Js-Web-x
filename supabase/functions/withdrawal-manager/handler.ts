@@ -162,7 +162,7 @@ async function authenticate(req: Request) {
     await supabaseAdmin
       .from("profiles")
       .select(
-        "id, full_name, user_mobile, lottery_id, balance, account_status, user_role, user_secret_pin"
+        "id, full_name, user_mobile, lottery_id, balance, account_status, user_role, user_secret_pin, user_lottery_fee_paid, user_lottery_is_terms_accepted"
       )
       .eq("id", data.user.id)
       .maybeSingle();
@@ -204,6 +204,100 @@ async function getWithdrawalSettings() {
   return data;
 }
 
+// =========================================
+// NEW: CHECK USER WITHDRAWAL ELIGIBILITY
+// =========================================
+
+async function checkWithdrawalEligibility(profile: any) {
+  if (profile.user_lottery_is_terms_accepted !== true) {
+    return {
+      eligible: false,
+      reason: "terms_not_accepted",
+      message: "Withdrawal terms must be accepted first.",
+    };
+  }
+
+  if (profile.user_lottery_fee_paid !== true) {
+    return {
+      eligible: false,
+      reason: "fee_not_approved",
+      message: "Lottery fee payment is not approved yet.",
+    };
+  }
+
+  // Approved assessment
+  const { data: assessments, error: assessmentError } =
+    await supabaseAdmin
+      .from("lottery_fee_assessments")
+      .select("id")
+      .eq("winner_user_id", profile.id)
+      .eq("payment_status", "approved");
+
+  if (assessmentError) throw assessmentError;
+
+  if (!assessments || assessments.length === 0) {
+    return {
+      eligible: false,
+      reason: "fee_assessment_not_approved",
+      message: "Approved fee assessment was not found.",
+    };
+  }
+
+  const assessmentIds = assessments.map((item: any) => item.id);
+
+  // Payment and verification must belong to the same approved assessment
+  const [paymentsResult, verificationResult] = await Promise.all([
+    supabaseAdmin
+      .from("lottery_fee_payments")
+      .select("assessment_id")
+      .in("assessment_id", assessmentIds)
+      .eq("user_id", profile.id)
+      .eq("status", "approved"),
+
+    supabaseAdmin
+      .from("lottery_verification_requests")
+      .select("assessment_id")
+      .in("assessment_id", assessmentIds)
+      .eq("user_id", profile.id)
+      .eq("identity_status", "approved")
+      .eq("payment_method_status", "approved"),
+  ]);
+
+  if (paymentsResult.error) throw paymentsResult.error;
+  if (verificationResult.error) throw verificationResult.error;
+
+  const approvedPaymentIds = new Set(
+    (paymentsResult.data || []).map((item: any) => item.assessment_id)
+  );
+
+  const approvedVerificationIds = new Set(
+    (verificationResult.data || []).map(
+      (item: any) => item.assessment_id
+    )
+  );
+
+  const fullyApproved = assessmentIds.some(
+    (id: string) =>
+      approvedPaymentIds.has(id) &&
+      approvedVerificationIds.has(id)
+  );
+
+  if (!fullyApproved) {
+    return {
+      eligible: false,
+      reason: "verification_not_approved",
+      message:
+        "Fee payment, identity verification and payment method verification must all be approved.",
+    };
+  }
+
+  return {
+    eligible: true,
+    reason: "approved",
+    message: "Withdrawal access approved.",
+  };
+}
+
 async function generateTrackingId() {
   const random = crypto.getRandomValues(new Uint32Array(2));
 
@@ -235,6 +329,16 @@ serve(async (req) => {
     const profile = await authenticate(req);
     const body = await req.json();
     const action = String(body.action ?? "").trim();
+
+    // =========================================
+    // NEW: USER WITHDRAWAL PAGE ACCESS CHECK
+    // =========================================
+
+    if (action === "check_withdrawal_eligibility") {
+      const eligibility = await checkWithdrawalEligibility(profile);
+
+      return response(eligibility);
+    }
 
     // =========================================
     // USER: GET METHODS AND GLOBAL SETTINGS
