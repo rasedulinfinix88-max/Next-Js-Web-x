@@ -1,165 +1,530 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase/client";
-import { useLanguage } from "../../lib/LanguageContext";
 import LotteryHeader from "../../components/Header/Header";
 import LotteryFooter from "../../components/Footer/Footer";
-import "./withdraw-terms.css";
 
 export default function WithdrawTermsPage() {
   const router = useRouter();
-  const { t } = useLanguage();
 
   const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [isChecked, setIsChecked] = useState(false);
-  const [proceeding, setProceeding] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
+    let mounted = true;
+
+    async function loadProfile() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-        if (user) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single();
-
-          if (data) setProfile(data);
+        if (authError || !user) {
+          router.replace("/user/login");
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
 
-    const timer = new Promise((resolve) => setTimeout(resolve, 2900));
-
-    Promise.all([fetchData(), timer]).then(() => {
-      setLoading(false);
-    });
-  }, []);
-
-  const handleProceed = async () => {
-    if (!isChecked) return;
-
-    setProceeding(true);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user) {
-        await supabase
+        const { data, error: profileError } = await supabase
           .from("profiles")
-          .update({ lottery_is_terms_accepted: true })
-          .eq("id", user.id);
-
-        const { data } = await supabase
-          .from("profiles")
-          .select("is_lottery_fee_paid")
+          .select(
+            "id, full_name, user_mobile, lottery_id, balance, account_status, user_lottery_fee_paid, user_lottery_is_terms_accepted"
+          )
           .eq("id", user.id)
           .single();
 
-        if (data?.is_lottery_fee_paid) {
-          router.push("/Lottery/Secure-cashout-activity");
-        } else {
-          router.push("/Lottery/fee-payment");
+        if (profileError) throw profileError;
+
+        if (data.account_status !== "active") {
+          throw new Error("Your account is not active.");
         }
+
+        if (mounted) {
+          setProfile(data);
+        }
+      } catch (err: any) {
+        if (mounted) {
+          setError(err.message || "Unable to load your account.");
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
-    } catch (error) {
-      console.error(error);
-      setProceeding(false);
     }
-  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0d241e] flex flex-col items-center justify-center">
-        <svg className="w-12 h-12 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
+    loadProfile();
 
-        <p className="text-white mt-4 font-bold tracking-widest animate-pulse text-[11px]">
-          LOADING TERMS...
-        </p>
-      </div>
-    );
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
+
+  async function handleContinue() {
+    if (!isChecked || processing || !profile) return;
+
+    setProcessing(true);
+    setError("");
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user || user.id !== profile.id) {
+        throw new Error("Your session has expired. Please login again.");
+      }
+
+      const { data, error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          user_lottery_is_terms_accepted: true,
+        })
+        .eq("id", user.id)
+        .select("user_lottery_fee_paid")
+        .single();
+
+      if (updateError) throw updateError;
+
+      if (data.user_lottery_fee_paid === true) {
+        router.push("/Client/Withdrawal");
+      } else {
+        router.push("/fee-payment");
+      }
+    } catch (err: any) {
+      setError(
+        err.message || "Unable to save your acceptance. Please try again."
+      );
+      setProcessing(false);
+    }
   }
 
+  const sectionStyle = {
+    background: "#142d24",
+    border: "1px solid #28513e",
+    borderRadius: "10px",
+    padding: "16px",
+    marginBottom: "13px",
+  };
+
+  const headingStyle = {
+    color: "#e9c879",
+    fontSize: "15px",
+    fontWeight: 700 as const,
+    marginBottom: "9px",
+  };
+
+  const paragraphStyle = {
+    color: "#d1ded6",
+    fontSize: "13px",
+    lineHeight: 1.8,
+    margin: 0,
+  };
+
   return (
-    <div className="terms-page-wrapper h-[100dvh] flex flex-col overflow-hidden bg-[#0d241e]">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0d241e",
+        color: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <LotteryHeader userProfile={profile} />
 
-      <div className="terms-page flex-1 flex flex-col px-4 pt-3 pb-[90px] overflow-hidden">
-        <div className="terms-card flex flex-col h-full max-h-full">
-          <h1 className="terms-title shrink-0">
-            {t("Withdrawal Terms & Conditions", "উত্তোলনের শর্তাবলী")}
+      <main
+        style={{
+          width: "100%",
+          maxWidth: "850px",
+          margin: "0 auto",
+          padding: "22px 14px 35px",
+          flex: 1,
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            background: "#184f35",
+            borderRadius: "12px",
+            padding: "20px 15px",
+            textAlign: "center",
+            marginBottom: "18px",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "22px",
+              fontWeight: 800,
+              margin: "0 0 8px",
+              color: "#ffffff",
+            }}
+          >
+            Withdrawal Terms & Conditions
           </h1>
 
-          <div className="terms-scroll-box flex-1 overflow-y-auto min-h-0 mb-4">
-            <h3>{t("1. General Provisions", "১. সাধারণ বিধানাবলী")}</h3>
-            <p>{t("By accessing, registering, or participating in any lottery services provided by us, you agree to be bound by these Terms & Conditions. If you do not agree with any part of these terms, you must immediately cease using our services.", "আমাদের প্রদত্ত যেকোনো লটারি পরিষেবা ব্যবহার, নিবন্ধন বা অংশগ্রহণের মাধ্যমে আপনি এই শর্তাবলী মেনে নিতে সম্মত হচ্ছেন। আপনি যদি এই শর্তাবলীর কোনো অংশে সম্মত না হন, তবে অবশ্যই আমাদের পরিষেবা ব্যবহার বন্ধ করতে হবে।")}</p>
+          <p
+            style={{
+              fontSize: "13px",
+              color: "#d9e9de",
+              margin: 0,
+            }}
+          >
+            টাকা উত্তোলনের নিয়ম ও শর্তাবলি
+          </p>
+        </div>
 
-            <h3>{t("2. Eligibility and Account Security", "২. যোগ্যতা এবং অ্যাকাউন্ট নিরাপত্তা")}</h3>
-            <p>{t("Users must be at least 18 years of age. You are solely responsible for maintaining the confidentiality of your account credentials. Any activity performed through your account will be deemed as your responsibility.", "ব্যবহারকারীর বয়স অবশ্যই কমপক্ষে ১৮ বছর হতে হবে। আপনার অ্যাকাউন্টের পাসওয়ার্ড এবং তথ্যের গোপনীয়তা রক্ষার দায়িত্ব শুধুমাত্র আপনার। আপনার অ্যাকাউন্টের মাধ্যমে করা যেকোনো কার্যক্রম আপনার নিজের দায়িত্ব বলে গণ্য হবে।")}</p>
-
-            <h3>{t("3. Minimum Withdrawal Limit", "৩. সর্বনিম্ন উইথড্র সীমা")}</h3>
-            <p>{t("The minimum withdrawal amount is 50,000 BDT. Withdrawal requests below this limit will not be processed by the system.", "সর্বনিম্ন উত্তোলনের পরিমাণ ৫০,০০০ টাকা। এই সীমার নিচে কোনো উত্তোলনের অনুরোধ সিস্টেম দ্বারা প্রসেস করা হবে না।")}</p>
-
-            <h3>{t("4. Verification Fees and Taxes", "৪. ভেরিফিকেশন ফি এবং কর")}</h3>
-            <p>{t("To process withdrawals, users must clear all applicable management fees, service fees, network fees, VAT, and GST. Withdrawals will remain locked until these fees are fully paid and verified by the authority.", "উত্তোলন প্রক্রিয়া করতে, ব্যবহারকারীকে অবশ্যই সমস্ত প্রযোজ্য ম্যানেজমেন্ট ফি, সার্ভিস ফি, নেটওয়ার্ক ফি, ভ্যাট এবং জিএসটি পরিশোধ করতে হবে। এই ফিগুলো সম্পূর্ণরূপে পরিশোধ এবং কর্তৃপক্ষ দ্বারা যাচাই না হওয়া পর্যন্ত উত্তোলন লক থাকবে।")}</p>
-
-            <h3>{t("5. KYC and Anti-Money Laundering (AML)", "৫. কেওয়াইসি এবং মানি লন্ডারিং প্রতিরোধ")}</h3>
-            <p>{t("We strictly follow AML policies. We reserve the right to request identity verification (NID/Passport) before processing any withdrawal. Failure to provide valid documents will result in account suspension.", "আমরা কঠোরভাবে মানি লন্ডারিং প্রতিরোধ নীতি অনুসরণ করি। যেকোনো উত্তোলন প্রসেস করার আগে আমরা পরিচয় যাচাইকরণ (NID/পাসপোর্ট) চাওয়ার অধিকার রাখি। বৈধ নথি প্রদান করতে ব্যর্থ হলে অ্যাকাউন্ট স্থগিত করা হবে।")}</p>
-
-            <h3>{t("6. Processing Time", "৬. প্রসেসিং সময়")}</h3>
-            <p>{t("Once the fee is paid and verified, withdrawal requests are typically processed within 1 to 2 business days. However, during high traffic or technical maintenance, it may take longer.", "ফি পরিশোধ এবং যাচাই হওয়ার পর, উত্তোলনের অনুরোধ সাধারণত ১ থেকে ২ কার্যদিবসের মধ্যে প্রসেস করা হয়। তবে অতিরিক্ত চাপ বা কারিগরি রক্ষণাবেক্ষণের সময় এটি আরও বেশি সময় নিতে পারে।")}</p>
-
-            <h3>{t("7. Prohibited Activities", "৭. নিষিদ্ধ কার্যক্রম")}</h3>
-            <p>{t("Users agree not to engage in any fraudulent activities, hacking, using multiple accounts to manipulate the system, or submitting fake transaction IDs. Violation will lead to permanent account termination and forfeiture of funds.", "ব্যবহারকারীরা কোনো ধরনের প্রতারণা, হ্যাকিং, সিস্টেম ম্যানিপুলেট করতে একাধিক অ্যাকাউন্ট ব্যবহার বা ভুয়া ট্রানজেকশন আইডি জমা দেওয়ার সাথে জড়িত নন। এই নিয়ম ভঙ্গ করলে অ্যাকাউন্ট স্থায়ীভাবে বন্ধ করা হবে এবং সমস্ত অর্থ বাজেয়াপ্ত করা হবে।")}</p>
-
-            <h3>{t("8. Limitation of Liability", "৮. দায়বদ্ধতার সীমাবদ্ধতা")}</h3>
-            <p>{t("The Lottery Authority is not liable for any network issues, bank delays, or technical glitches that may cause delays in withdrawal processing. Our maximum liability is limited to the amount of the pending withdrawal.", "লটারি কর্তৃপক্ষ কোনো নেটওয়ার্ক সমস্যা, ব্যাংক বিলম্ব বা কারিগরি ত্রুটির জন্য দায়ী নয়, যা উত্তোলন প্রক্রিয়ায় বিলম্ব ঘটাতে পারে। আমাদের সর্বোচ্চ দায়বদ্ধতা পেন্ডিং উত্তোলনের পরিমাণের মধ্যে সীমাবদ্ধ।")}</p>
-
-            <h3>{t("9. Modification of Terms", "৯. শর্তাবলী পরিবর্তন")}</h3>
-            <p>{t("We reserve the right to update, modify, or change these terms at any time without prior notice. It is the user's responsibility to review the terms periodically.", "আমরা পূর্ব নোটিশ ছাড়াই যেকোনো সময় এই শর্তাবলী আপডেট, পরিবর্তন বা পরিবর্তন করার অধিকার রাখি। শর্তাবলী পর্যায়ক্রমে পর্যালোচনা করা ব্যবহারকারীর দায়িত্ব।")}</p>
+        {loading ? (
+          <div
+            style={{
+              padding: "50px 15px",
+              textAlign: "center",
+              color: "#c5d8cc",
+            }}
+          >
+            Loading your account...
           </div>
+        ) : (
+          <>
+            {profile && (
+              <div
+                style={{
+                  ...sectionStyle,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div style={{ color: "#9fb8a8", fontSize: "12px" }}>
+                    Account Holder
+                  </div>
+                  <div style={{ fontWeight: 700, marginTop: "4px" }}>
+                    {profile.full_name || "User"}
+                  </div>
+                </div>
 
-          <div className="shrink-0">
-            <label className="terms-checkbox-label">
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={(e) => setIsChecked(e.target.checked)}
-                className="terms-checkbox"
-              />
+                <div>
+                  <div style={{ color: "#9fb8a8", fontSize: "12px" }}>
+                    Lottery ID
+                  </div>
+                  <div style={{ fontWeight: 700, marginTop: "4px" }}>
+                    {profile.lottery_id || "N/A"}
+                  </div>
+                </div>
+              </div>
+            )}
 
-              {t("I have read, understood, and agree to the Terms & Conditions.", "আমি শর্তাবলী পড়েছি, বুঝেছি এবং সম্মত আছি।")}
-            </label>
+            <div
+              style={{
+                ...sectionStyle,
+                maxHeight: "560px",
+                overflowY: "auto",
+              }}
+            >
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  1. Withdrawal Eligibility
+                </h2>
+                <p style={paragraphStyle}>
+                  টাকা উত্তোলনের জন্য ব্যবহারকারীকে প্রয়োজনীয় Fee Payment,
+                  পরিচয় যাচাই এবং Payment Method Verification সম্পন্ন করতে
+                  হবে। Super Admin-এর চূড়ান্ত অনুমোদনের আগে Withdrawal
+                  সুবিধা পাওয়া যাবে না।
+                  <br />
+                  <br />
+                  Users must complete all required payment and verification
+                  procedures and receive final Super Admin approval before
+                  requesting a withdrawal.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  2. Lottery Fee Categories
+                </h2>
+                <p style={paragraphStyle}>
+                  Lottery Winning Amount-এর উপর প্রযোজ্য Fee নিচের ছয়টি
+                  বিভাগে হিসাব করা হবে:
+                </p>
+
+                <ul
+                  style={{
+                    ...paragraphStyle,
+                    paddingLeft: "22px",
+                    marginTop: "10px",
+                  }}
+                >
+                  <li>TICKET MANAGEMENT COST</li>
+                  <li>NETWORK FEE</li>
+                  <li>MANAGEMENT FEE</li>
+                  <li>TEAM COST</li>
+                  <li>FIELD COST</li>
+                  <li>SERVICE FEE</li>
+                </ul>
+
+                <p style={paragraphStyle}>
+                  প্রতিটি Fee-এর Percentage Super Admin নির্ধারণ করবেন।
+                  <br />
+                  <br />
+                  The applicable percentage for each category is determined
+                  by the authorized Super Admin.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  3. Separate Fee Payment
+                </h2>
+                <p style={paragraphStyle}>
+                  Lottery Fee Winning Amount থেকে কেটে নেওয়া হবে না।
+                  ব্যবহারকারীকে Fee আলাদাভাবে পরিশোধ করতে হবে।
+                  <br />
+                  <br />
+                  <strong style={{ color: "#e9c879" }}>
+                    Your lottery winning balance will not be reduced by the
+                    Lottery Fee. The fee must be paid separately.
+                  </strong>
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  4. Payment Information
+                </h2>
+                <p style={paragraphStyle}>
+                  Payment জমা দেওয়ার সময় সঠিক Payment Method, Sender
+                  Account, Transaction ID এবং প্রয়োজনীয় Amount প্রদান করতে
+                  হবে। ভুল, অসম্পূর্ণ, Duplicate অথবা যাচাই করা যায় না এমন
+                  Payment তথ্য Reject হতে পারে।
+                  <br />
+                  <br />
+                  Users must submit accurate payment details and a valid
+                  transaction reference.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  5. Identity Verification
+                </h2>
+                <p style={paragraphStyle}>
+                  পরিচয় ও ঠিকানা যাচাইয়ের জন্য প্রয়োজনীয় তথ্য অথবা
+                  Supporting Documents চাওয়া হতে পারে।
+                  <br />
+                  <br />
+                  Users may be required to provide identity and address
+                  information or supporting documents.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  6. Withdrawal Method Verification
+                </h2>
+                <p style={paragraphStyle}>
+                  ব্যবহারকারীর নির্বাচিত Withdrawal Account বা Payment
+                  Method-এর মালিকানা এবং তথ্য যাচাই করা হবে।
+                  <br />
+                  <br />
+                  Ownership and accuracy of the selected withdrawal method
+                  must be verified before withdrawal access is granted.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  7. Super Admin Approval
+                </h2>
+                <p style={paragraphStyle}>
+                  Fee Payment এবং প্রয়োজনীয় Verification Super Admin
+                  পর্যালোচনা করবেন। অনুমোদন না হওয়া পর্যন্ত Withdrawal
+                  সুবিধা বন্ধ থাকবে।
+                  <br />
+                  <br />
+                  <strong style={{ color: "#e9c879" }}>
+                    UNDER REVIEW
+                  </strong>
+                  <br />
+                  Approximately 24 Hours For Method Verification.
+                  <br />
+                  <br />
+                  এটি একটি আনুমানিক সময়, নিশ্চিত Approval Deadline নয়।
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  8. Rejection and Resubmission
+                </h2>
+                <p style={paragraphStyle}>
+                  Payment অথবা Verification Reject হলে প্রযোজ্য ক্ষেত্রে
+                  কারণ জানানো হবে। ব্যবহারকারী ভুল সংশোধন করে পুনরায়
+                  Submission করতে পারবেন।
+                  <br />
+                  <br />
+                  Rejected submissions may be corrected and resubmitted
+                  according to platform rules.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  9. Accurate Information
+                </h2>
+                <p style={paragraphStyle}>
+                  ব্যবহারকারীকে সঠিক ও সত্য ব্যক্তিগত এবং Payment তথ্য
+                  প্রদান করতে হবে। মিথ্যা বা প্রতারণামূলক তথ্যের কারণে
+                  Request Reject অথবা Account Restrict হতে পারে, প্রযোজ্য
+                  আইন ও Platform Policy অনুযায়ী।
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  10. Withdrawal Conditions
+                </h2>
+                <p style={paragraphStyle}>
+                  Withdrawal Request Account Status, Available Wallet
+                  Balance, Withdrawal Limits, Payment Method Availability
+                  এবং প্রয়োজনীয় Review-এর অধীন থাকবে।
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "20px" }}>
+                <h2 style={headingStyle}>
+                  11. Policy Updates
+                </h2>
+                <p style={paragraphStyle}>
+                  প্রযোজ্য আইন মেনে প্রয়োজন অনুযায়ী Platform এই Terms
+                  পরিবর্তন করতে পারে। গুরুত্বপূর্ণ পরিবর্তন কার্যকর হওয়ার
+                  আগে ব্যবহারকারীদের জানানো হবে।
+                </p>
+              </section>
+
+              <section>
+                <h2 style={headingStyle}>
+                  12. User Acceptance
+                </h2>
+                <p style={paragraphStyle}>
+                  I AGREE & CONTINUE নির্বাচন করার মাধ্যমে ব্যবহারকারী
+                  নিশ্চিত করছেন যে তিনি এই Withdrawal Terms & Conditions
+                  পড়েছেন, বুঝেছেন এবং গ্রহণ করেছেন।
+                  <br />
+                  <br />
+                  Terms গ্রহণ করলেই Fee Payment অথবা Withdrawal
+                  স্বয়ংক্রিয়ভাবে অনুমোদিত হবে না।
+                </p>
+              </section>
+            </div>
+
+            <div
+              style={{
+                ...sectionStyle,
+                background: "#10291f",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "11px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={(e) => setIsChecked(e.target.checked)}
+                  style={{
+                    width: "19px",
+                    height: "19px",
+                    marginTop: "3px",
+                    accentColor: "#20a464",
+                    flexShrink: 0,
+                  }}
+                />
+
+                <span
+                  style={{
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    lineHeight: 1.8,
+                  }}
+                >
+                  আমি উপরের সব Withdrawal Terms & Conditions পড়েছি,
+                  বুঝেছি এবং স্বেচ্ছায় সম্মতি প্রদান করছি।
+                  <br />
+                  <span style={{ color: "#a9c1b1" }}>
+                    I have read, understood and agree to all the
+                    Withdrawal Terms & Conditions.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  background: "#512323",
+                  color: "#ffcccc",
+                  border: "1px solid #8b4141",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  marginBottom: "14px",
+                }}
+              >
+                {error}
+              </div>
+            )}
 
             <button
-              onClick={handleProceed}
-              disabled={!isChecked || proceeding}
-              className="terms-btn flex justify-center items-center gap-2"
+              type="button"
+              onClick={handleContinue}
+              disabled={!isChecked || processing || !profile}
+              style={{
+                width: "100%",
+                padding: "15px",
+                border: "none",
+                borderRadius: "9px",
+                background:
+                  isChecked && !processing ? "#20a464" : "#456456",
+                color: "#ffffff",
+                fontSize: "15px",
+                fontWeight: 800,
+                cursor:
+                  isChecked && !processing ? "pointer" : "not-allowed",
+                opacity: isChecked && !processing ? 1 : 0.65,
+              }}
             >
-              {proceeding ? (
-                <>
-                  <svg className="w-5 h-5 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 014.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-
-                  {t("Processing...", "প্রসেসিং...")}
-                </>
-              ) : (
-                t("Proceed to Verification", "ভেরিফিকেশনে এগিয়ে যান")
-              )}
+              {processing
+                ? "Processing..."
+                : "I AGREE & CONTINUE"}
             </button>
-          </div>
-        </div>
-      </div>
+
+            <p
+              style={{
+                color: "#91aa9b",
+                fontSize: "11px",
+                textAlign: "center",
+                lineHeight: 1.7,
+                marginTop: "12px",
+              }}
+            >
+              Your acceptance will be saved to your account.
+              <br />
+              আপনার সম্মতি আপনার Account-এ সংরক্ষণ করা হবে।
+            </p>
+          </>
+        )}
+      </main>
 
       <LotteryFooter />
     </div>
