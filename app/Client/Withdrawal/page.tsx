@@ -101,6 +101,9 @@ export default function WithdrawalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
 
+  // NEW: Withdrawal eligibility state
+  const [eligibility, setEligibility] = useState<any>(null);
+
   const [amount, setAmount] = useState("");
   const [secretPin, setSecretPin] = useState("");
 
@@ -235,12 +238,55 @@ export default function WithdrawalPage() {
   const loadPageData = useCallback(async () => {
     setLoading(true);
     setMessage({ type: "", text: "" });
+    setEligibility(null);
 
     try {
       const userProfile = await loadProfile();
 
       if (!userProfile) return;
 
+      // NEW: Check eligibility before loading Withdrawal features
+      const accessCheck = await invokeFunction({
+        action: "check_withdrawal_eligibility",
+      });
+
+      // Fail closed: only explicit approval grants access
+      if (accessCheck?.eligible !== true) {
+        setEligibility({
+          eligible: false,
+          reason: accessCheck?.reason || "check_failed",
+          message:
+            accessCheck?.message ||
+            t(
+              "Withdrawal access is not approved.",
+              "উইথড্র ব্যবহারের অনুমতি এখনো পাওয়া যায়নি।"
+            ),
+        });
+
+        // Terms must be accepted first
+        if (accessCheck?.reason === "terms_not_accepted") {
+          router.replace("/withdraw-terms/");
+          return;
+        }
+
+        // Fee payment must be approved first
+        if (accessCheck?.reason === "fee_not_approved") {
+          router.replace("/fee-payment/");
+          return;
+        }
+
+        // Other pending/rejected verification:
+        // Keep Withdrawal features inaccessible.
+        return;
+      }
+
+      setEligibility({
+        eligible: true,
+        reason: "approved",
+        message: accessCheck.message,
+      });
+
+      // Existing page data loading remains unchanged
       const results = await Promise.allSettled([
         loadMethods(),
         loadAccounts(),
@@ -255,11 +301,25 @@ export default function WithdrawalPage() {
         throw failed.reason;
       }
     } catch (error: any) {
+      // NEW: If eligibility check fails, block access
+      setEligibility({
+        eligible: false,
+        reason: "check_failed",
+        message: getErrorMessage(error),
+      });
+
       notify("error", getErrorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [loadProfile, loadMethods, loadAccounts, loadHistory]);
+  }, [
+    loadProfile,
+    loadMethods,
+    loadAccounts,
+    loadHistory,
+    router,
+    t,
+  ]);
 
   useEffect(() => {
     loadPageData();
@@ -427,6 +487,17 @@ export default function WithdrawalPage() {
   };
 
   const handleWithdraw = async () => {
+    if (eligibility?.eligible !== true) {
+      notify(
+        "error",
+        t(
+          "Withdrawal approval is required.",
+          "উইথড্র অনুমোদন প্রয়োজন।"
+        )
+      );
+      return;
+    }
+
     if (!selectedMethod) {
       notify(
         "error",
@@ -550,7 +621,10 @@ export default function WithdrawalPage() {
   const methodEnabled =
     selectedMethod?.is_enabled === true;
 
-  const canWithdraw = globalEnabled && methodEnabled;
+  const canWithdraw =
+    eligibility?.eligible === true &&
+    globalEnabled &&
+    methodEnabled;
 
   if (loading) {
     return (
@@ -569,6 +643,74 @@ export default function WithdrawalPage() {
         <p className="text-white text-sm">
           {t("Please login to continue.", "চালিয়ে যেতে লগইন করুন।")}
         </p>
+      </div>
+    );
+  }
+
+  // NEW: Block the entire Withdrawal page until approval
+  if (eligibility?.eligible !== true) {
+    const checkFailed = eligibility?.reason === "check_failed";
+
+    return (
+      <div className="cashout-page-wrapper min-h-screen">
+        <div className="cashout-overlay min-h-screen flex flex-col">
+          <LotteryHeader userProfile={profile} />
+
+          <main className="cashout-main flex-1 flex items-center justify-center">
+            <div className="form-card w-full text-center">
+              <div className="text-4xl mb-4">
+                {checkFailed ? "⚠️" : "🔒"}
+              </div>
+
+              <h2 className="text-white text-lg font-extrabold mb-3">
+                {checkFailed
+                  ? t(
+                      "Verification Check Unavailable",
+                      "যাচাই করা যাচ্ছে না"
+                    )
+                  : t(
+                      "WITHDRAWAL UNDER REVIEW",
+                      "উইথড্র অনুমোদনের অপেক্ষায়"
+                    )}
+              </h2>
+
+              <p className="text-[#A0ADB0] text-sm leading-7">
+                {eligibility?.message ||
+                  t(
+                    "Your payment and verification must be approved by Super Admin before withdrawal access is available.",
+                    "উইথড্র সুবিধা চালু হওয়ার আগে আপনার পেমেন্ট ও যাচাইকরণ Super Admin কর্তৃক অনুমোদিত হতে হবে।"
+                  )}
+              </p>
+
+              {!checkFailed && (
+                <div className="mt-5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4">
+                  <p className="text-yellow-400 font-bold text-xs">
+                    UNDER REVIEW
+                  </p>
+
+                  <p className="text-[#A0ADB0] text-xs mt-2 leading-6">
+                    {t(
+                      "Your payment and withdrawal method are being verified. Please wait for Super Admin approval.",
+                      "আপনার পেমেন্ট এবং উইথড্র পদ্ধতি যাচাই করা হচ্ছে। Super Admin-এর অনুমোদনের জন্য অপেক্ষা করুন।"
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {checkFailed && (
+                <button
+                  type="button"
+                  onClick={loadPageData}
+                  className="w-full mt-5 bg-[#184f35] border border-white text-white rounded-lg py-3 text-sm font-bold"
+                >
+                  {t("Try Again", "আবার চেষ্টা করুন")}
+                </button>
+              )}
+            </div>
+          </main>
+
+          <LotteryFooter />
+        </div>
       </div>
     );
   }
