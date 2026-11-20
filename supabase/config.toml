@@ -1,1 +1,4 @@
 
+[functions.ticket-verify-public]
+verify_jwt = false
+
