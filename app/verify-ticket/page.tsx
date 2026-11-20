@@ -125,31 +125,264 @@ function TicketVerificationContent() {
     }
   }
 
+  function handlePrint() {
+    window.print();
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#101a14",
-        color: "#fff",
-        padding: "35px 16px",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <section
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          background: "#18251d",
-          border: "1px solid #315b40",
-          borderRadius: 16,
-          padding: 24,
-          boxShadow: "0 12px 35px rgba(0,0,0,0.3)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
+    <main className="verification-page">
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+
+        .verification-page {
+          min-height: 100vh;
+          background: #101a14;
+          color: #fff;
+          padding: 35px 16px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-family: Arial, sans-serif;
+        }
+
+        .verification-container {
+          width: 100%;
+          max-width: 440px;
+          background: #18251d;
+          border: 1px solid #315b40;
+          border-radius: 16px;
+          padding: 24px;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+        }
+
+        .ticket-card {
+          width: 100%;
+          overflow: hidden;
+          border-radius: 9px;
+          background: linear-gradient(
+            155deg,
+            #ff514c 0%,
+            #d91e2b 48%,
+            #8e071b 100%
+          );
+          color: #292929;
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .ticket-header {
+          padding: 22px 15px 15px;
+          text-align: center;
+          color: #fff;
+        }
+
+        .ticket-brand {
+          font-size: 39px;
+          line-height: 1;
+          font-weight: 900;
+          letter-spacing: 2px;
+        }
+
+        .ticket-subtitle {
+          margin: 12px 0 0;
+          padding: 10px;
+          border-radius: 5px;
+          background: #fff;
+          color: #333;
+          font-size: 17px;
+          font-style: italic;
+          font-weight: bold;
+        }
+
+        .ticket-number-strip {
+          margin: 0 13px 10px;
+          padding: 13px 8px;
+          background: #fff;
+          border-radius: 4px;
+          text-align: center;
+        }
+
+        .ticket-number-label {
+          display: block;
+          color: #777;
+          font-size: 10px;
+          font-weight: bold;
+          letter-spacing: 1.5px;
+          margin-bottom: 6px;
+        }
+
+        .ticket-number-value {
+          display: block;
+          color: #252525;
+          font-size: 23px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          overflow-wrap: anywhere;
+        }
+
+        .ticket-information {
+          margin: 0 13px;
+          padding: 17px 14px;
+          background: #fff;
+          border-radius: 4px;
+        }
+
+        .ticket-section-title {
+          color: #a30e25;
+          font-size: 17px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          padding-bottom: 8px;
+          border-bottom: 2px solid #d51d31;
+          margin-bottom: 12px;
+        }
+
+        .ticket-info-row {
+          padding: 11px 0;
+          border-bottom: 1px dashed #d7d7d7;
+        }
+
+        .ticket-info-row:last-child {
+          border-bottom: none;
+        }
+
+        .ticket-info-label {
+          color: #777;
+          font-size: 11px;
+          font-weight: bold;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          margin-bottom: 5px;
+        }
+
+        .ticket-info-value {
+          color: #292929;
+          font-size: 15px;
+          font-weight: 800;
+          overflow-wrap: anywhere;
+        }
+
+        .ticket-footer {
+          padding: 15px 12px 19px;
+          text-align: center;
+          color: #fff;
+        }
+
+        .ticket-verified {
+          display: inline-block;
+          padding: 7px 16px;
+          border: 1px solid rgba(255, 255, 255, 0.8);
+          border-radius: 30px;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 1.5px;
+        }
+
+        .ticket-footer-note {
+          font-size: 10px;
+          line-height: 1.5;
+          margin: 10px 0 0;
+          color: #ffe5e5;
+        }
+
+        .print-button {
+          width: 100%;
+          margin-top: 17px;
+          padding: 14px;
+          border: none;
+          border-radius: 8px;
+          background: #fff;
+          color: #a30e25;
+          font-size: 15px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .another-button {
+          width: 100%;
+          margin-top: 12px;
+          padding: 13px;
+          border: 1px solid #42634d;
+          border-radius: 9px;
+          background: #101a14;
+          color: #00e701;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        @media print {
+          @page {
+            size: 80mm auto;
+            margin: 4mm;
+          }
+
+          html,
+          body {
+            width: 100%;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .ticket-card,
+          .ticket-card * {
+            visibility: visible !important;
+          }
+
+          .verification-page {
+            display: block !important;
+            min-height: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+          }
+
+          .verification-container {
+            display: block !important;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            box-shadow: none !important;
+          }
+
+          .no-print {
+            display: none !important;
+          }
+
+          .ticket-card {
+            width: 100% !important;
+            margin: 0 auto !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          .ticket-header,
+          .ticket-footer,
+          .ticket-card,
+          .ticket-subtitle,
+          .ticket-number-strip,
+          .ticket-information {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
+      <section className="verification-container">
+        <div className="no-print" style={{ textAlign: "center" }}>
           <div style={{ fontSize: 42 }}>🎟️</div>
 
           <h1
@@ -168,7 +401,11 @@ function TicketVerificationContent() {
         </div>
 
         {!token && !ticket && !loading && (
-          <form onSubmit={handleManualSearch} style={{ marginTop: 25 }}>
+          <form
+            className="no-print"
+            onSubmit={handleManualSearch}
+            style={{ marginTop: 25 }}
+          >
             <p
               style={{
                 color: "#b7c5bb",
@@ -188,7 +425,6 @@ function TicketVerificationContent() {
               autoComplete="off"
               style={{
                 width: "100%",
-                boxSizing: "border-box",
                 padding: "15px 13px",
                 borderRadius: 9,
                 border: "1px solid #42634d",
@@ -222,6 +458,7 @@ function TicketVerificationContent() {
 
         {(loading || searching) && (
           <div
+            className="no-print"
             style={{
               textAlign: "center",
               padding: "35px 5px",
@@ -229,14 +466,13 @@ function TicketVerificationContent() {
             }}
           >
             <div style={{ fontSize: 30 }}>⏳</div>
-            <p style={{ marginTop: 12 }}>
-              Verifying Ticket...
-            </p>
+            <p style={{ marginTop: 12 }}>Verifying Ticket...</p>
           </div>
         )}
 
         {!loading && !searching && error && (
           <div
+            className="no-print"
             style={{
               marginTop: 25,
               padding: 18,
@@ -288,99 +524,89 @@ function TicketVerificationContent() {
 
         {!loading && !searching && ticket && (
           <div style={{ marginTop: 25 }}>
-            <div
-              style={{
-                textAlign: "center",
-                background: "#123321",
-                border: "1px solid #00a94f",
-                padding: 14,
-                borderRadius: 10,
-                marginBottom: 20,
-              }}
-            >
-              <div style={{ fontSize: 28 }}>✅</div>
+            <div className="ticket-card">
+              <div className="ticket-header">
+                <div className="ticket-brand">LOTTO</div>
+                <div className="ticket-subtitle">Official Lottery Ticket</div>
+              </div>
 
-              <strong
-                style={{
-                  color: "#00E701",
-                  display: "block",
-                  marginTop: 6,
-                }}
-              >
-                VERIFIED TICKET
-              </strong>
-            </div>
-
-            {[
-              ["Ticket Number", ticket.ticket_number],
-              ["Draw Date", formatDrawDate(ticket.draw_date)],
-              ["Purchase Status", ticket.purchase_status],
-              ["Winner Status", ticket.winner_status],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                style={{
-                  padding: "15px 12px",
-                  borderBottom: "1px solid #34483a",
-                }}
-              >
-                <div
-                  style={{
-                    color: "#aebdb2",
-                    fontSize: 12,
-                    marginBottom: 7,
-                  }}
-                >
-                  {label}
-                </div>
-
-                <strong
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {value}
+              <div className="ticket-number-strip">
+                <span className="ticket-number-label">TICKET NUMBER</span>
+                <strong className="ticket-number-value">
+                  {ticket.ticket_number}
                 </strong>
               </div>
-            ))}
 
-            <p
-              style={{
-                textAlign: "center",
-                color: "#aebdb2",
-                fontSize: 11,
-                marginTop: 22,
-              }}
-            >
-              This verification confirms the ticket information
-              returned by the official system.
-            </p>
+              <div className="ticket-information">
+                <div className="ticket-section-title">
+                  VERIFIED TICKET
+                </div>
 
-            {!token && (
+                <div className="ticket-info-row">
+                  <div className="ticket-info-label">Ticket Number</div>
+                  <div className="ticket-info-value">
+                    {ticket.ticket_number}
+                  </div>
+                </div>
+
+                <div className="ticket-info-row">
+                  <div className="ticket-info-label">Draw Date</div>
+                  <div className="ticket-info-value">
+                    {formatDrawDate(ticket.draw_date)}
+                  </div>
+                </div>
+
+                <div className="ticket-info-row">
+                  <div className="ticket-info-label">Purchase Status</div>
+                  <div className="ticket-info-value">
+                    {ticket.purchase_status}
+                  </div>
+                </div>
+
+                <div className="ticket-info-row">
+                  <div className="ticket-info-label">Winner Status</div>
+                  <div className="ticket-info-value">
+                    {ticket.winner_status}
+                  </div>
+                </div>
+              </div>
+
+              <div className="ticket-footer">
+                <div className="ticket-verified">
+                  ✓ OFFICIALLY VERIFIED
+                </div>
+
+                <p className="ticket-footer-note">
+                  This ticket information was verified by the official system.
+                  <br />
+                  Keep this ticket for your records.
+                </p>
+              </div>
+            </div>
+
+            <div className="no-print">
               <button
                 type="button"
-                onClick={() => {
-                  setTicket(null);
-                  setTicketNumber("");
-                  setError("");
-                }}
-                style={{
-                  width: "100%",
-                  marginTop: 18,
-                  padding: 13,
-                  border: "1px solid #42634d",
-                  borderRadius: 9,
-                  background: "#101a14",
-                  color: "#00E701",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
+                className="print-button"
+                onClick={handlePrint}
               >
-                VERIFY ANOTHER TICKET
+                🖨️ PRINT TICKET
               </button>
-            )}
+
+              {!token && (
+                <button
+                  type="button"
+                  className="another-button"
+                  onClick={() => {
+                    setTicket(null);
+                    setTicketNumber("");
+                    setError("");
+                  }}
+                >
+                  VERIFY ANOTHER TICKET
+                </button>
+              )}
+            </div>
           </div>
         )}
       </section>
