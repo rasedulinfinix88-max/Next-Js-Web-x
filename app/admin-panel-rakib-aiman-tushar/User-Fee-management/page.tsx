@@ -1,12 +1,11 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../lib/supabase/client";
-import { useLanguage } from "../../../lib/LanguageContext";
-import LotteryHeader from "../Header/Header";
-import LotteryFooter from "../Footer/Footer";
+import { createClient } from "../../../lib/supabase/client";
+import { checkAdminAccess } from "../../../lib/admin/admin-auth";
+import AdminMenu from "../../../components/admin/AdminMenu";
 
 type FeeSetting = {
   id: string;
@@ -15,16 +14,6 @@ type FeeSetting = {
   percentage: number;
   is_enabled: boolean;
   updated_at?: string;
-};
-
-type Profile = {
-  id: string;
-  full_name: string;
-  user_mobile: string;
-  lottery_id: string;
-  account_status: string;
-  user_role: string;
-  balance: number;
 };
 
 const FEE_ORDER = [
@@ -47,89 +36,75 @@ const FEE_LABELS: Record<string, string> = {
 
 export default function UserFeeManagementPage() {
   const router = useRouter();
-  const { t } = useLanguage();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const supabase = useMemo(() => createClient(), []);
+
   const [fees, setFees] = useState<FeeSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingCode, setSavingCode] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    loadPage();
-  }, []);
-
-  async function loadPage() {
+  const loadPage = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+      const access = await checkAdminAccess();
 
-      if (authError || !user) {
+      if (!access.allowed) {
         router.replace("/");
         return;
       }
 
-      const { data: profileData, error: profileError } =
-        await supabase
-          .from("profiles")
-          .select(
-            "id, full_name, user_mobile, lottery_id, account_status, user_role, balance"
-          )
-          .eq("id", user.id)
-          .single();
-
-      if (profileError || !profileData) {
-        throw new Error("Unable to load admin profile.");
-      }
-
-      if (
-        profileData.user_role !== "super_admin" ||
-        profileData.account_status !== "active"
-      ) {
+      if (access.role !== "super_admin") {
         router.replace("/");
         return;
       }
 
-      setProfile(profileData);
-
-      const { data: feeData, error: feeError } =
-        await supabase
-          .from("lottery_fee_settings")
-          .select(
-            "id, fee_code, fee_name, percentage, is_enabled, updated_at"
-          );
+      const { data, error: feeError } = await supabase
+        .from("lottery_fee_settings")
+        .select(
+          "id, fee_code, fee_name, percentage, is_enabled, updated_at"
+        );
 
       if (feeError) throw feeError;
 
-      const orderedFees = [...(feeData || [])]
-        .sort(
-          (a, b) =>
-            FEE_ORDER.indexOf(a.fee_code) -
-            FEE_ORDER.indexOf(b.fee_code)
-        )
+      const orderedFees = [...(data || [])]
+        .sort((a, b) => {
+          const aIndex = FEE_ORDER.indexOf(a.fee_code);
+          const bIndex = FEE_ORDER.indexOf(b.fee_code);
+
+          return (
+            (aIndex === -1 ? 999 : aIndex) -
+            (bIndex === -1 ? 999 : bIndex)
+          );
+        })
         .map((fee) => ({
           ...fee,
           percentage: Number(fee.percentage),
         }));
 
       setFees(orderedFees);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load fee settings."
+      );
     } finally {
       setLoading(false);
     }
-  }
+  }, [router, supabase]);
 
-  function updateFee(
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
+
+  const updateFee = (
     feeCode: string,
     changes: Partial<FeeSetting>
-  ) {
+  ) => {
     setFees((current) =>
       current.map((fee) =>
         fee.fee_code === feeCode
@@ -138,11 +113,11 @@ export default function UserFeeManagementPage() {
       )
     );
 
-    setSuccess("");
     setError("");
-  }
+    setSuccess("");
+  };
 
-  async function saveFee(fee: FeeSetting) {
+  const saveFee = async (fee: FeeSetting) => {
     setError("");
     setSuccess("");
 
@@ -158,6 +133,13 @@ export default function UserFeeManagementPage() {
     setSavingCode(fee.fee_code);
 
     try {
+      const access = await checkAdminAccess();
+
+      if (!access.allowed || access.role !== "super_admin") {
+        router.replace("/");
+        return;
+      }
+
       const { data, error: rpcError } = await supabase.rpc(
         "admin_set_lottery_fee",
         {
@@ -189,30 +171,37 @@ export default function UserFeeManagementPage() {
       );
 
       setSuccess(
-        `${fee.fee_name} ${t("saved successfully.", "সফলভাবে সংরক্ষণ হয়েছে।")}`
+        `${fee.fee_name} saved successfully.`
       );
-    } catch (err: any) {
-      setError(err.message || "Unable to save fee settings.");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save fee settings."
+      );
     } finally {
       setSavingCode(null);
     }
-  }
+  };
 
   const totalEnabledPercentage = fees
     .filter((fee) => fee.is_enabled)
-    .reduce((total, fee) => total + Number(fee.percentage), 0);
+    .reduce(
+      (total, fee) => total + Number(fee.percentage),
+      0
+    );
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#07110d] text-white flex items-center justify-center">
-        {t("Loading Fee Management...", "Fee Management লোড হচ্ছে...")}
+        Loading Fee Management...
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#07110d] text-white">
-      <LotteryHeader userProfile={profile} />
+      <AdminMenu />
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <div className="mb-6">
@@ -221,14 +210,11 @@ export default function UserFeeManagementPage() {
           </p>
 
           <h1 className="text-2xl md:text-3xl font-bold">
-            {t("User Fee Management", "User Fee Management")}
+            User Fee Management
           </h1>
 
           <p className="text-sm text-gray-400 mt-2">
-            {t(
-              "Manage all six lottery fee categories.",
-              "Lottery-এর ছয়টি Fee Category পরিচালনা করুন।"
-            )}
+            Manage all six lottery fee categories.
           </p>
         </div>
 
@@ -246,7 +232,7 @@ export default function UserFeeManagementPage() {
 
         <div className="rounded-2xl border border-[#24513a] bg-[#10251b] p-4 mb-6">
           <p className="text-sm text-gray-400">
-            {t("Total Enabled Fee Percentage", "সক্রিয় Fee-এর মোট Percentage")}
+            Total Enabled Fee Percentage
           </p>
 
           <div className="text-3xl font-bold text-emerald-400 mt-2">
@@ -254,10 +240,7 @@ export default function UserFeeManagementPage() {
           </div>
 
           <p className="text-xs text-gray-500 mt-2">
-            {t(
-              "Only enabled fee categories are included.",
-              "শুধু Enabled Fee Category হিসাব করা হয়েছে।"
-            )}
+            Only enabled fee categories are included.
           </p>
         </div>
 
@@ -291,7 +274,7 @@ export default function UserFeeManagementPage() {
 
               <div className="mb-4">
                 <label className="block text-sm text-gray-400 mb-2">
-                  {t("Fee Percentage (%)", "Fee Percentage (%)")}
+                  Fee Percentage (%)
                 </label>
 
                 <div className="relative">
@@ -320,7 +303,7 @@ export default function UserFeeManagementPage() {
 
               <label className="flex items-center justify-between gap-3 rounded-xl bg-[#091a11] border border-[#254c38] p-3 cursor-pointer">
                 <span className="text-sm font-medium">
-                  {t("Enable this fee", "এই Fee চালু করুন")}
+                  Enable this fee
                 </span>
 
                 <input
@@ -342,8 +325,8 @@ export default function UserFeeManagementPage() {
                 className="w-full mt-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-3 font-bold text-white transition"
               >
                 {savingCode === fee.fee_code
-                  ? t("Saving...", "সংরক্ষণ হচ্ছে...")
-                  : t("Save Fee Settings", "Fee Settings সংরক্ষণ করুন")}
+                  ? "Saving..."
+                  : "Save Fee Settings"}
               </button>
             </div>
           ))}
@@ -351,28 +334,22 @@ export default function UserFeeManagementPage() {
 
         {fees.length === 0 && (
           <div className="rounded-xl bg-[#10251b] border border-[#254c38] p-5 text-center text-gray-400">
-            {t(
-              "No fee categories found.",
-              "কোনো Fee Category পাওয়া যায়নি।"
-            )}
+            No fee categories found.
           </div>
         )}
 
         <div className="mt-6 rounded-xl border border-yellow-800/60 bg-yellow-950/20 p-4">
           <p className="text-sm text-yellow-300 font-semibold">
-            {t("Important Notice", "গুরুত্বপূর্ণ")}
+            Important Notice
           </p>
 
           <p className="text-xs text-gray-400 mt-2 leading-6">
-            {t(
-              "Fee rates are saved separately for each category. Changes are recorded in the existing fee audit log. A fee assessment uses the enabled rates when the assessment is created.",
-              "প্রতিটি Fee আলাদাভাবে সংরক্ষণ হয়। পরিবর্তনের হিসাব বিদ্যমান Fee Audit Log-এ রাখা হয়। Fee Assessment তৈরি হওয়ার সময় Enabled Rate ব্যবহার করা হয়।"
-            )}
+            Each fee category is saved separately. Changes are recorded
+            in the existing fee audit log. A fee assessment uses the
+            enabled rates when the assessment is created.
           </p>
         </div>
       </main>
-
-      <LotteryFooter />
     </div>
   );
 }
