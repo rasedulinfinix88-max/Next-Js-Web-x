@@ -25,6 +25,25 @@ const supabaseAdmin = createClient(
   }
 );
 
+// User JWT সহ RPC client তৈরি
+function createUserRpcClient(token: string) {
+  return createClient(
+    supabaseUrl,
+    serviceRoleKey,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
 function response(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -519,12 +538,23 @@ serve(async (req) => {
 
       const trackingId = await generateTrackingId();
 
-      // Atomic database RPC.
-      // SQL function will lock balance, debit wallet,
-      // create request, and save immutable account snapshot.
+      // User JWT is passed to the secure RPC.
+      // The RPC checks terms, fee payment and verification,
+      // then calls the existing atomic withdrawal function.
 
-      const { data, error } = await supabaseAdmin.rpc(
-        "withdrawal_create_request",
+      const userToken = getBearerToken(req);
+
+      if (!userToken) {
+        return response(
+          { error: "Authentication required" },
+          401
+        );
+      }
+
+      const supabaseUserRpc = createUserRpcClient(userToken);
+
+      const { data, error } = await supabaseUserRpc.rpc(
+        "secure_withdrawal_create_request",
         {
           p_user_id: profile.id,
           p_account_id: accountId,
@@ -631,9 +661,6 @@ serve(async (req) => {
           400
         );
       }
-
-      // Atomic RPC: checks pending status and performs
-      // approval or exactly-once refund.
 
       const { data, error } = await supabaseAdmin.rpc(
         "withdrawal_review_request",
