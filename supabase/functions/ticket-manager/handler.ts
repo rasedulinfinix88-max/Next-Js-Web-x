@@ -341,41 +341,16 @@ Deno.serve(async (req: Request) => {
       if (error) {
         console.error("Admin winner selection RPC error:", error.message);
 
-        const message =
-          error.message || "Winner selection failed.";
-
-        const lowerMessage = message.toLowerCase();
-
-        const status =
-          lowerMessage.includes("super admin") ||
-          lowerMessage.includes("authentication")
-            ? 403
-            : 400;
-
-        return response(status, {
+        return response(400, {
           success: false,
-          message,
-        });
-      }
-
-      if (!data || data.success !== true) {
-        return response(500, {
-          success: false,
-          message: "Winner selection could not be confirmed.",
+          message: error.message || "Winner selection failed.",
         });
       }
 
       return response(200, {
         success: true,
         message: "Winner selected successfully.",
-        winner: {
-          draw_id: data.draw_id,
-          ticket_id: data.winning_ticket_id,
-          ticket_number: data.winning_ticket_number,
-          user_id: data.winner_user_id,
-          prize_amount: data.prize_amount,
-          result_status: data.result_status,
-        },
+        winner: data,
       });
     }
 
