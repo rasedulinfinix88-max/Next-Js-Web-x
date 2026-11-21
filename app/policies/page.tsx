@@ -1,8 +1,8 @@
 
 "use client";
 
-import LotteryHeader from "../components/Header";
-import LotteryFooter from "../components/Footer";
+import LotteryHeader from "../../components/Header/Header";
+import LotteryFooter from "../../components/Footer/Footer";
 import { useLanguage } from "../../lib/LanguageContext";
 
 export default function PoliciesPage() {
