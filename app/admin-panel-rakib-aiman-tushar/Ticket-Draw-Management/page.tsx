@@ -4,8 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase/client";
-import LotteryHeader from "../../../components/Header/Header";
-import LotteryFooter from "../../../components/Footer/Footer";
 
 type TicketDraw = {
   id: string;
@@ -404,8 +402,6 @@ export default function TicketDrawManagementPage() {
 
   return (
     <div className="tdm-page">
-      <LotteryHeader userProfile={profile} />
-
       <main className="tdm-main">
         <div className="tdm-heading">
           <div>
@@ -721,8 +717,6 @@ export default function TicketDrawManagementPage() {
           </div>
         </div>
       )}
-
-      <LotteryFooter />
 
       <style jsx global>{`
         .tdm-page {
