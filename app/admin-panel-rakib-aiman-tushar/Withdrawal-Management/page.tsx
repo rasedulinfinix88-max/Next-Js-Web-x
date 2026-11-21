@@ -400,7 +400,7 @@ export default function WithdrawalManagementPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#07130c] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#07110d] text-white">
         <div className="text-center">
           <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-green-900 border-t-green-400" />
           <p className="text-sm text-gray-300">
@@ -413,7 +413,7 @@ export default function WithdrawalManagementPage() {
 
   if (accessDenied) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#07130c] px-4 text-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#07110d] px-4 text-white">
         <div className="w-full max-w-md rounded-2xl border border-red-900 bg-[#10251a] p-6 text-center">
           <h1 className="mb-2 text-xl font-bold text-red-400">
             Access Denied
@@ -433,8 +433,30 @@ export default function WithdrawalManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07130c] text-white">
-      <AdminMenu />
+    <div className="withdrawal-mobile-zoom min-h-screen bg-[#07110d] text-white">
+      <style jsx global>{`
+        @media (max-width: 639px) {
+          .withdrawal-mobile-zoom {
+            zoom: 0.7;
+          }
+        }
+      `}</style>
+
+      <header className="border-b border-[#24543b] bg-[#10251a] px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-green-400">
+              GAZICASINO ADMIN
+            </h1>
+
+            <p className="mt-1 text-xs text-gray-400">
+              Withdrawal Management
+            </p>
+          </div>
+
+          <AdminMenu />
+        </div>
+      </header>
 
       <main className="mx-auto w-full max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -445,9 +467,6 @@ export default function WithdrawalManagementPage() {
             <p className="mt-1 text-sm text-gray-400">
               Manage withdrawal requests, payment methods and settings.
             </p>
-            <span className="mt-2 inline-flex rounded-full border border-green-700/50 bg-green-900/30 px-3 py-1 text-xs font-semibold text-green-300">
-              {adminRole.replace("_", " ").toUpperCase()}
-            </span>
           </div>
 
           <div className="flex gap-2">
