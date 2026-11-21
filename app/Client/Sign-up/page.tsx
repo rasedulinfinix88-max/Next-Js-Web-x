@@ -354,7 +354,7 @@ function SignupForm() {
             disabled={loading}
             className="w-full font-bold text-sm py-2.5 rounded-lg mt-2 transition-colors disabled:opacity-50 flex justify-center items-center"
             style={{
-              backgroundColor: "#00E701",
+              backgroundColor: "#218653",
               color: "#000",
               height: "44px",
             }}
