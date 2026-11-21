@@ -14,34 +14,58 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
     </svg>
   ),
+
   Logout: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
     </svg>
   ),
+
   Globe: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
     </svg>
   ),
+
   Money: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
+
   Trophy: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
     </svg>
   ),
+
   List: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
     </svg>
   ),
+
   Document: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+
+  Ticket: () => (
+    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 9a3 3 0 003-3h14a3 3 0 003 3v6a3 3 0 00-3 3H5a3 3 0 00-3-3V9zm10-3v2m0 3v2m0 3v2" />
+    </svg>
+  ),
+
+  Verify: () => (
+    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5-3a2 2 0 01-1-1.732V4a1 1 0 00-1-1h-3.268a2 2 0 01-1.414-.586l-1.732-1.732a1 1 0 00-1.414 0L7.44 2.414A2 2 0 016.026 3H3a1 1 0 00-1 1v2.268A2 2 0 011.414 7.682L.0 9.096a1 1 0 000 1.414l1.414 1.414A2 2 0 012 13.338V16a1 1 0 001 1h2.268a2 2 0 011.414.586l1.732 1.732a1 1 0 001.414 0l1.732-1.732A2 2 0 0112.974 17H16a1 1 0 001-1v-2.268a2 2 0 01.586-1.414L19 10.904a1 1 0 000-1.414L17.586 8.076A2 2 0 0117 6.662V4" />
+    </svg>
+  ),
+
+  Support: () => (
+    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 10a6 6 0 00-12 0v4a2 2 0 002 2h1v-5H8a4 4 0 018 0h-1v5h1a2 2 0 002-2v-4zM18 16a4 4 0 01-4 4h-2" />
     </svg>
   ),
 };
@@ -158,10 +182,29 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
             className="absolute top-[64px] right-3 mt-1 w-64 bg-[#184f35] border border-[#26352e] rounded-xl shadow-2xl overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}
           >
+            {isLoggedIn && (
+              <>
+                {/* 1. Buy Tickets */}
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push("/Client/Ticket-Buy/");
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
+                >
+                  <Icons.Ticket />
+                  <span className="text-[11px] font-semibold">
+                    {t("Buy Tickets", "টিকিট কিনুন")}
+                  </span>
+                </button>
+              </>
+            )}
+
+            {/* 2. Reload Balance */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Lottery/Secure-payment");
+                router.push("/Client/Secure/Deposit-method/");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
@@ -173,23 +216,25 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
 
             {isLoggedIn && (
               <>
+                {/* 3. Withdrawal */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/withdraw-terms");
+                    router.push("/Client/Withdrawal/");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
                   <Icons.Document />
                   <span className="text-[11px] font-semibold">
-                    {t("Withdraw Fund", "ফান্ড উত্তোলন")}
+                    {t("Withdrawal", "উত্তোলন")}
                   </span>
                 </button>
 
+                {/* 4. Winner */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/winners");
+                    router.push("/Winner-selection/");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -199,10 +244,25 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                   </span>
                 </button>
 
+                {/* 5. Verify Ticket */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
-                    router.push("/Lottery/Transactions-activity");
+                    router.push("/verify-ticket/");
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
+                >
+                  <Icons.Verify />
+                  <span className="text-[11px] font-semibold">
+                    {t("Verify Ticket", "টিকিট যাচাই")}
+                  </span>
+                </button>
+
+                {/* 6. Transactions */}
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push("/Client/Transactions/");
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
                 >
@@ -211,19 +271,48 @@ export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
                     {t("Transactions", "লেনদেন")}
                   </span>
                 </button>
+
+                {/* 7. Ticket Transactions */}
+                <button
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    router.push("/Client/Ticket-transactions/");
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
+                >
+                  <Icons.Ticket />
+                  <span className="text-[11px] font-semibold">
+                    {t("Ticket Transactions", "টিকিট লেনদেন")}
+                  </span>
+                </button>
               </>
             )}
 
+            {/* 8. Policy Condition */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
-                router.push("/Lottery/withdraw-terms");
+                router.push("/policies/");
               }}
               className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
             >
               <Icons.Document />
               <span className="text-[11px] font-semibold">
-                {t("Terms Condition", "শর্তাবলী")}
+                {t("Policy Condition", "নীতিমালা ও শর্তাবলী")}
+              </span>
+            </button>
+
+            {/* 9. Support Center */}
+            <button
+              onClick={() => {
+                setIsMenuOpen(false);
+                router.push("/Support-center");
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
+            >
+              <Icons.Support />
+              <span className="text-[11px] font-semibold">
+                {t("Support Center", "সাপোর্ট সেন্টার")}
               </span>
             </button>
 
