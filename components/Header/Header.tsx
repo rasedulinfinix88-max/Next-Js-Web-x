@@ -71,7 +71,7 @@ export default function LotteryHeader({
 }: LotteryHeaderProps) {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
-  const { siteName } = useSiteSettings();
+  const { siteName, logoUrl } = useSiteSettings();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(
@@ -163,15 +163,23 @@ export default function LotteryHeader({
     <>
       <header className="bg-[#184f35] px-4 py-4 flex items-center justify-between sticky top-0 z-50 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.3)] border-b-2 border-[#26352e]">
 
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col">
-            <div className="text-xl font-black text-white tracking-widest uppercase leading-tight drop-shadow-md">
+        <div className="flex items-center gap-3 min-w-0">
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt={`${siteName} Logo`}
+              className="w-10 h-10 object-contain rounded-md shrink-0"
+            />
+          )}
+
+          <div className="flex flex-col min-w-0">
+            <div className="text-xl font-black text-white tracking-widest uppercase leading-tight drop-shadow-md truncate">
               {siteName || "Lotto Dhaka"}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {isLoggedIn ? (
             <button
               onClick={() => router.push("/Notification")}
