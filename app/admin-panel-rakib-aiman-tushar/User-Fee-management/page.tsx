@@ -681,15 +681,31 @@ export default function UserFeeManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#07110d] text-white">
-      <AdminMenu />
+    <div className="user-fee-mobile-zoom min-h-screen bg-[#07110d] text-white">
+      <style jsx global>{`
+        @media (max-width: 639px) {
+          .user-fee-mobile-zoom {
+            zoom: 0.7;
+          }
+        }
+      `}</style>
+
+      <header className="border-b border-[#24543b] bg-[#10251a] px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-green-400">
+              GAZICASINO ADMIN
+            </h1>
+            <p className="mt-1 text-xs text-gray-400">
+              User Fee Management
+            </p>
+          </div>
+          <AdminMenu />
+        </div>
+      </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <p className="text-sm text-emerald-400 font-semibold mb-2">
-            SUPER ADMIN PANEL
-          </p>
-
           <h1 className="text-2xl md:text-3xl font-bold">
             User Fee Management
           </h1>
