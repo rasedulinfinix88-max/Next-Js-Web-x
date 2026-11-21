@@ -18,78 +18,78 @@ export default function LotteryFooter() {
       <Link href="/" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
           isActive("/")
-            ? "bg-[#183f35] shadow-[0_0_15px_rgba(255,255,255,0.6)] scale-110"
-            : "hover:bg-white/10"
+            ? "bg-[#183f35] scale-110"
+            : "hover:bg-[#218653]"
         }`}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
         </div>
-        <span className={`text-[11px] font-bold mt-1 ${isActive("/") ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-gray-300"}`}>
+        <span className={`text-[11px] font-bold mt-1 ${isActive("/") ? "text-white" : "text-gray-300"}`}>
           {t("Play", "খেলুন")}
         </span>
       </Link>
 
       {/* 2. Checker */}
-      <Link href="/Lottery/Chacker" className="flex flex-col items-center cursor-pointer transition-colors text-white">
+      <Link href="/verify-ticket/" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
-          isActive("/Lottery/Chacker")
-            ? "bg-[#183f35] shadow-[0_0_15px_rgba(255,255,255,0.6)] scale-110"
-            : "hover:bg-white/10"
+          isActive("/verify-ticket/")
+            ? "bg-[#183f35] scale-110"
+            : "hover:bg-[#218653]"
         }`}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <span className={`text-[11px] font-bold mt-1 ${isActive("/Lottery/Chacker") ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-gray-300"}`}>
+        <span className={`text-[11px] font-bold mt-1 ${isActive("/verify-ticket/") ? "text-white" : "text-gray-300"}`}>
           {t("Checker", "চেকার")}
         </span>
       </Link>
 
-      {/* 3. My Tickets */}
+      {/* 3. Jackpot */}
       <Link href="/Lottery/tickets-buy-activity" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
           isActive("/Lottery/tickets-buy-activity")
-            ? "bg-[#183f35] shadow-[0_0_15px_rgba(255,255,255,0.6)] scale-110"
-            : "hover:bg-white/10"
+            ? "bg-[#183f35] scale-110"
+            : "hover:bg-[#218653]"
         }`}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z" />
           </svg>
         </div>
-        <span className={`text-[11px] font-bold mt-1 ${isActive("/Lottery/tickets-buy-activity") ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-gray-300"}`}>
-          {t("Tickets", "টিকিট")}
+        <span className={`text-[11px] font-bold mt-1 ${isActive("/Lottery/tickets-buy-activity") ? "text-white" : "text-gray-300"}`}>
+          {t("Jackpot", "জ্যাকপট")}
         </span>
       </Link>
 
-      {/* 4. Winners */}
-      <Link href="/Lottery/winners" className="flex flex-col items-center cursor-pointer transition-colors text-white">
+      {/* 4. Winner */}
+      <Link href="/Winner-selection/" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
-          isActive("/Lottery/winners")
-            ? "bg-[#183f35] shadow-[0_0_15px_rgba(255,255,255,0.6)] scale-110"
-            : "hover:bg-white/10"
+          isActive("/Winner-selection/")
+            ? "bg-[#183f35] scale-110"
+            : "hover:bg-[#218653]"
         }`}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
           </svg>
         </div>
-        <span className={`text-[11px] font-bold mt-1 ${isActive("/Lottery/winners") ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-gray-300"}`}>
-          {t("Winners", "বিজয়ী")}
+        <span className={`text-[11px] font-bold mt-1 ${isActive("/Winner-selection/") ? "text-white" : "text-gray-300"}`}>
+          {t("Winner", "বিজয়ী")}
         </span>
       </Link>
 
       {/* 5. Profile */}
-      <Link href="/Lottery/Profile" className="flex flex-col items-center cursor-pointer transition-colors text-white">
+      <Link href="/Client/User/Profile/" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
-          isActive("/Lottery/Profile")
-            ? "bg-[#183f35] shadow-[0_0_15px_rgba(255,255,255,0.6)] scale-110"
-            : "hover:bg-white/10"
+          isActive("/Client/User/Profile/")
+            ? "bg-[#183f35] scale-110"
+            : "hover:bg-[#218653]"
         }`}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.8">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
-        <span className={`text-[11px] font-bold mt-1 ${isActive("/Lottery/Profile") ? "text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" : "text-gray-300"}`}>
+        <span className={`text-[11px] font-bold mt-1 ${isActive("/Client/User/Profile/") ? "text-white" : "text-gray-300"}`}>
           {t("Profile", "প্রোফাইল")}
         </span>
       </Link>
@@ -97,4 +97,3 @@ export default function LotteryFooter() {
     </nav>
   );
 }
-
