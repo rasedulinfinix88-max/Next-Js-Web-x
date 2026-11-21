@@ -41,7 +41,7 @@ type AssessmentRecord = {
 type ProfileRecord = {
   id: string;
   full_name: string | null;
-  game_id: string | null;
+  lottery_id: string | null;
 };
 
 type FeePaymentReview = {
@@ -148,7 +148,7 @@ export default function UserFeeManagementPage() {
 
         supabase
           .from("profiles")
-          .select("id, full_name, game_id")
+          .select("id, full_name, lottery_id")
           .in("id", userIds),
       ]);
 
@@ -693,7 +693,7 @@ export default function UserFeeManagementPage() {
                               {item.profile?.full_name || "Unknown User"}
                             </p>
                             <p className="text-xs text-gray-400 mt-1">
-                              Lottery ID: {item.profile?.game_id || "N/A"}
+                              Lottery ID: {item.profile?.lottery_id || "N/A"}
                             </p>
                           </div>
 
@@ -740,7 +740,7 @@ export default function UserFeeManagementPage() {
                     <div>
                       <p className="text-xs text-gray-500">Lottery ID</p>
                       <p className="text-sm text-white font-semibold mt-1">
-                        {selectedPayment.profile?.game_id || "N/A"}
+                        {selectedPayment.profile?.lottery_id || "N/A"}
                       </p>
                     </div>
 
