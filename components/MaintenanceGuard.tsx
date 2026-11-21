@@ -6,15 +6,13 @@ import { usePathname } from "next/navigation";
 import { supabase } from "../lib/supabase/client";
 import { useSiteSettings } from "../lib/SiteSettingsContext";
 
-const BASE_PATH = "/Next-Js-Web-x";
-
 const ADMIN_PATH =
   "/admin-panel-rakib-aiman-tushar/maintenance-for-faster";
 
 function normalizePath(path: string) {
   let result = path.split("?")[0].toLowerCase();
 
-  const basePath = BASE_PATH.toLowerCase().replace(/\/+$/, "");
+  const basePath = "/next-js-web-x";
 
   if (
     result === basePath ||
@@ -144,7 +142,8 @@ export default function MaintenanceGuard({
 
     if (isAdminPage && isAdmin) return;
 
-    window.location.replace(`${BASE_PATH}/maintenance/`);
+    // Next.js automatically adds the configured basePath.
+    window.location.replace("/maintenance/");
 
   }, [
     isLoading,
