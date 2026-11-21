@@ -33,12 +33,6 @@ const Icons = {
     </svg>
   ),
 
-  Trophy: () => (
-    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-    </svg>
-  ),
-
   List: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -54,12 +48,6 @@ const Icons = {
   Ticket: () => (
     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 9a3 3 0 003-3h14a3 3 0 003 3v6a3 3 0 00-3 3H5a3 3 0 00-3-3V9zm10-3v2m0 3v2m0 3v2" />
-    </svg>
-  ),
-
-  Verify: () => (
-    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5-3a2 2 0 01-1-1.732V4a1 1 0 00-1-1h-3.268a2 2 0 01-1.414-.586l-1.732-1.732a1 1 0 00-1.414 0L7.44 2.414A2 2 0 016.026 3H3a1 1 0 00-1 1v2.268A2 2 0 011.414 7.682L.0 9.096a1 1 0 000 1.414l1.414 1.414A2 2 0 012 13.338V16a1 1 0 001 1h2.268a2 2 0 011.414.586l1.732 1.732a1 1 0 001.414 0l1.732-1.732A2 2 0 0112.974 17H16a1 1 0 001-1v-2.268a2 2 0 01.586-1.414L19 10.904a1 1 0 000-1.414L17.586 8.076A2 2 0 0117 6.662V4" />
     </svg>
   ),
 
@@ -120,7 +108,6 @@ export default function LotteryHeader({
     };
 
     const checkUserAndNotifications = async () => {
-      // Main page has already checked the session during its loading screen
       if (initialAuthChecked) {
         setIsLoggedIn(initialIsLoggedIn);
 
@@ -139,7 +126,6 @@ export default function LotteryHeader({
         return;
       }
 
-      // Other pages continue to check their own session
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -234,25 +220,7 @@ export default function LotteryHeader({
             className="absolute top-[64px] right-3 mt-1 w-64 bg-[#184f35] border border-[#26352e] rounded-xl shadow-2xl overflow-hidden py-1"
             onClick={(e) => e.stopPropagation()}
           >
-            {isLoggedIn && (
-              <>
-                {/* 1. Buy Tickets */}
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    router.push("/Client/Ticket-Buy/");
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
-                >
-                  <Icons.Ticket />
-                  <span className="text-[11px] font-semibold">
-                    {t("Buy Tickets", "টিকিট কিনুন")}
-                  </span>
-                </button>
-              </>
-            )}
-
-            {/* 2. Reload Balance */}
+            {/* Reload Balance */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
@@ -268,7 +236,7 @@ export default function LotteryHeader({
 
             {isLoggedIn && (
               <>
-                {/* 3. Withdrawal */}
+                {/* Withdrawal */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
@@ -282,35 +250,7 @@ export default function LotteryHeader({
                   </span>
                 </button>
 
-                {/* 4. Winner */}
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    router.push("/Winner-selection/");
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
-                >
-                  <Icons.Trophy />
-                  <span className="text-[11px] font-semibold">
-                    {t("Winner", "বিজয়ী")}
-                  </span>
-                </button>
-
-                {/* 5. Verify Ticket */}
-                <button
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    router.push("/verify-ticket/");
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-black/20 transition border-b border-[#26352e]"
-                >
-                  <Icons.Verify />
-                  <span className="text-[11px] font-semibold">
-                    {t("Verify Ticket", "টিকিট যাচাই")}
-                  </span>
-                </button>
-
-                {/* 6. Transactions */}
+                {/* Transactions */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
@@ -324,7 +264,7 @@ export default function LotteryHeader({
                   </span>
                 </button>
 
-                {/* 7. Ticket Transactions */}
+                {/* Ticket Transactions */}
                 <button
                   onClick={() => {
                     setIsMenuOpen(false);
@@ -340,7 +280,7 @@ export default function LotteryHeader({
               </>
             )}
 
-            {/* 8. Policy Condition */}
+            {/* Policy Condition */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
@@ -354,7 +294,7 @@ export default function LotteryHeader({
               </span>
             </button>
 
-            {/* 9. Support Center */}
+            {/* Support Center */}
             <button
               onClick={() => {
                 setIsMenuOpen(false);
