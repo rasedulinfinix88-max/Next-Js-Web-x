@@ -44,7 +44,6 @@ export default function LotteryHomePage() {
 
     const fetchData = async () => {
       try {
-        // Check existing session without requiring a logged-in user
         const {
           data: { session },
           error: sessionError,
@@ -61,7 +60,6 @@ export default function LotteryHomePage() {
           setProfile(null);
         }
 
-        // Fetch profile only when a user is logged in
         if (user) {
           const { data: profileData } = await supabase
             .from("profiles")
@@ -74,7 +72,6 @@ export default function LotteryHomePage() {
           }
         }
 
-        // Fetch available draws for both logged-in and guest users
         const { data: drawData, error: drawFetchError } =
           await supabase.rpc("ticket_available_draws");
 
@@ -425,15 +422,6 @@ export default function LotteryHomePage() {
                         <span>Ticket Price</span>
                         <strong>
                           ৳ {Number(draw.ticket_price).toLocaleString()}
-                        </strong>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <span>Tickets Sold</span>
-                        <strong>
-                          {Number(
-                            draw.total_tickets_sold || 0
-                          ).toLocaleString()}
                         </strong>
                       </div>
                     </div>
