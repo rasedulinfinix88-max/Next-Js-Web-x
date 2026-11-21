@@ -71,6 +71,7 @@ export default function AdminMenu({
         </div>
 
         <nav className="flex-1 space-y-2 overflow-y-auto p-4">
+          {/* 1. User Dashboard */}
           <button
             type="button"
             onClick={() =>
@@ -82,26 +83,77 @@ export default function AdminMenu({
             Dashboard
           </button>
 
+          {/* 2. User Management */}
           <button
             type="button"
             onClick={() =>
               navigate(`${ADMIN_PATH}/User-management/`)
             }
-            className="flex w-full items-center gap-3 rounded-xl bg-[#184f35] px-4 py-3 text-left font-semibold text-white hover:bg-[#218653]"
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
           >
             <span className="text-xl">👥</span>
             User Management
           </button>
 
-          <div className="flex items-center justify-between rounded-xl px-4 py-3 text-gray-500">
-            <span>💳 Deposit Management</span>
-            <span className="text-[10px]">LATER</span>
-          </div>
+          {/* 3. Deposit Management */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`${ADMIN_PATH}/Deposit-management/`)
+            }
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
+          >
+            <span className="text-xl">💳</span>
+            Deposit Management
+          </button>
 
-          <div className="flex items-center justify-between rounded-xl px-4 py-3 text-gray-500">
-            <span>💸 Withdrawal Management</span>
-            <span className="text-[10px]">LATER</span>
-          </div>
+          {/* 4. Withdrawal Management */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`${ADMIN_PATH}/Withdrawal-Management/`)
+            }
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
+          >
+            <span className="text-xl">💸</span>
+            Withdrawal Management
+          </button>
+
+          {/* 5. User Fee Management */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`${ADMIN_PATH}/User-Fee-management/`)
+            }
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
+          >
+            <span className="text-xl">🧾</span>
+            User Fee Management
+          </button>
+
+          {/* 6. Ticket Draw Management */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`${ADMIN_PATH}/Ticket-Draw-Management/`)
+            }
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
+          >
+            <span className="text-xl">🎟️</span>
+            Ticket Draw Management
+          </button>
+
+          {/* 7. Support Management */}
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`${ADMIN_PATH}/Support-management/`)
+            }
+            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left font-semibold text-gray-200 hover:bg-[#184f35]"
+          >
+            <span className="text-xl">🎧</span>
+            Support Management
+          </button>
         </nav>
 
         <div className="border-t border-[#315d45] p-4">
