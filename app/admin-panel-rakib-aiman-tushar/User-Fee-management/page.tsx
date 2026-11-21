@@ -50,6 +50,29 @@ type FeePaymentReview = {
   profile: ProfileRecord | null;
 };
 
+type VerificationRecord = {
+  id: string;
+  assessment_id: string;
+  user_id: string;
+  identity_status: string;
+  payment_method_status: string;
+  identity_note: string | null;
+  payment_method_note: string | null;
+  created_at: string;
+};
+
+type FeeVerificationReview = {
+  verification: VerificationRecord;
+  assessment: AssessmentRecord | null;
+  profile: ProfileRecord | null;
+};
+
+type VerificationStatus =
+  | "pending"
+  | "under_review"
+  | "approved"
+  | "rejected";
+
 const FEE_ORDER = [
   "ticket_management_cost",
   "network_fee",
@@ -82,6 +105,22 @@ function formatDate(value: string) {
   });
 }
 
+function statusColor(status: string) {
+  if (status === "approved") {
+    return "bg-emerald-900/60 text-emerald-300";
+  }
+
+  if (status === "rejected") {
+    return "bg-red-900/60 text-red-300";
+  }
+
+  if (status === "under_review") {
+    return "bg-yellow-900/60 text-yellow-300";
+  }
+
+  return "bg-gray-800 text-gray-300";
+}
+
 export default function UserFeeManagementPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -103,6 +142,27 @@ export default function UserFeeManagementPage() {
   const [reviewing, setReviewing] = useState(false);
   const [reviewError, setReviewError] = useState("");
   const [reviewSuccess, setReviewSuccess] = useState("");
+
+  // Verification Review States
+  const [verificationOpen, setVerificationOpen] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationRequests, setVerificationRequests] = useState<
+    FeeVerificationReview[]
+  >([]);
+  const [selectedVerification, setSelectedVerification] =
+    useState<FeeVerificationReview | null>(null);
+
+  const [identityStatus, setIdentityStatus] =
+    useState<VerificationStatus>("pending");
+  const [paymentMethodStatus, setPaymentMethodStatus] =
+    useState<VerificationStatus>("pending");
+
+  const [identityNote, setIdentityNote] = useState("");
+  const [paymentMethodNote, setPaymentMethodNote] = useState("");
+
+  const [verificationSaving, setVerificationSaving] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationSuccess, setVerificationSuccess] = useState("");
 
   const loadReviewPayments = useCallback(async () => {
     setReviewLoading(true);
@@ -194,6 +254,103 @@ export default function UserFeeManagementPage() {
     }
   }, [supabase]);
 
+  // Load Verification Requests
+  const loadReviewVerifications = useCallback(async () => {
+    setVerificationLoading(true);
+    setVerificationError("");
+
+    try {
+      const { data: verificationData, error: verificationQueryError } =
+        await supabase
+          .from("lottery_verification_requests")
+          .select(
+            "id, assessment_id, user_id, identity_status, payment_method_status, identity_note, payment_method_note, created_at"
+          )
+          .or(
+            "identity_status.in.(pending,under_review),payment_method_status.in.(pending,under_review)"
+          )
+          .order("created_at", { ascending: false });
+
+      if (verificationQueryError) throw verificationQueryError;
+
+      const verifications = (verificationData || []) as VerificationRecord[];
+
+      if (verifications.length === 0) {
+        setVerificationRequests([]);
+        setSelectedVerification(null);
+        return;
+      }
+
+      const assessmentIds = [
+        ...new Set(verifications.map((item) => item.assessment_id)),
+      ];
+
+      const userIds = [
+        ...new Set(verifications.map((item) => item.user_id)),
+      ];
+
+      const [
+        { data: assessmentData, error: assessmentError },
+        { data: profileData, error: profileError },
+      ] = await Promise.all([
+        supabase
+          .from("lottery_fee_assessments")
+          .select(
+            "id, winning_amount, total_fee_amount, total_fee_percentage, payment_status"
+          )
+          .in("id", assessmentIds),
+
+        supabase
+          .from("profiles")
+          .select("id, full_name, lottery_id")
+          .in("id", userIds),
+      ]);
+
+      if (assessmentError) throw assessmentError;
+      if (profileError) throw profileError;
+
+      const assessments = (assessmentData || []) as AssessmentRecord[];
+      const profiles = (profileData || []) as ProfileRecord[];
+
+      const assessmentMap = new Map(
+        assessments.map((item) => [item.id, item])
+      );
+
+      const profileMap = new Map(
+        profiles.map((item) => [item.id, item])
+      );
+
+      const combined: FeeVerificationReview[] = verifications.map(
+        (verification) => ({
+          verification,
+          assessment: assessmentMap.get(verification.assessment_id) || null,
+          profile: profileMap.get(verification.user_id) || null,
+        })
+      );
+
+      setVerificationRequests(combined);
+
+      setSelectedVerification((current) => {
+        if (!current) return null;
+
+        return (
+          combined.find(
+            (item) =>
+              item.verification.id === current.verification.id
+          ) || null
+        );
+      });
+    } catch (err: unknown) {
+      setVerificationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load verification requests."
+      );
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [supabase]);
+
   const loadPage = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -231,7 +388,10 @@ export default function UserFeeManagementPage() {
 
       setFees(orderedFees);
 
-      await loadReviewPayments();
+      await Promise.all([
+        loadReviewPayments(),
+        loadReviewVerifications(),
+      ]);
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -241,7 +401,12 @@ export default function UserFeeManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, supabase, loadReviewPayments]);
+  }, [
+    router,
+    supabase,
+    loadReviewPayments,
+    loadReviewVerifications,
+  ]);
 
   useEffect(() => {
     loadPage();
@@ -413,6 +578,93 @@ export default function UserFeeManagementPage() {
     }
   };
 
+  // Open Verification Review
+  const openVerificationModal = async () => {
+    setVerificationOpen(true);
+    setSelectedVerification(null);
+    setVerificationError("");
+    setVerificationSuccess("");
+
+    await loadReviewVerifications();
+  };
+
+  const selectVerification = (item: FeeVerificationReview) => {
+    setSelectedVerification(item);
+
+    setIdentityStatus(
+      item.verification.identity_status as VerificationStatus
+    );
+
+    setPaymentMethodStatus(
+      item.verification.payment_method_status as VerificationStatus
+    );
+
+    setIdentityNote(item.verification.identity_note || "");
+    setPaymentMethodNote(item.verification.payment_method_note || "");
+
+    setVerificationError("");
+    setVerificationSuccess("");
+  };
+
+  // Save Verification Review
+  const reviewVerification = async () => {
+    if (!selectedVerification) return;
+
+    setVerificationSaving(true);
+    setVerificationError("");
+    setVerificationSuccess("");
+
+    try {
+      const access = await checkAdminAccess();
+
+      if (!access.allowed || access.role !== "super_admin") {
+        router.replace("/");
+        return;
+      }
+
+      const { data, error: rpcError } = await supabase.rpc(
+        "admin_review_lottery_fee_verification",
+        {
+          p_assessment_id:
+            selectedVerification.verification.assessment_id,
+
+          p_identity_status: identityStatus,
+
+          p_payment_method_status: paymentMethodStatus,
+
+          p_identity_note: identityNote.trim() || null,
+
+          p_payment_method_note: paymentMethodNote.trim() || null,
+        }
+      );
+
+      if (rpcError) throw rpcError;
+
+      if (!data) {
+        throw new Error("Verification review result was not returned.");
+      }
+
+      setVerificationSuccess(
+        "Verification review saved successfully."
+      );
+
+      setSelectedVerification(null);
+      setIdentityNote("");
+      setPaymentMethodNote("");
+
+      await loadReviewVerifications();
+      await loadReviewPayments();
+    } catch (err: unknown) {
+      setVerificationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to review this verification."
+      );
+    } finally {
+      setVerificationSaving(false);
+    }
+  };
+
   const totalEnabledPercentage = fees
     .filter((fee) => fee.is_enabled)
     .reduce(
@@ -460,7 +712,7 @@ export default function UserFeeManagementPage() {
         )}
 
         {/* Fee Payment Review Button */}
-        <div className="rounded-2xl border border-emerald-700/60 bg-[#10251b] p-4 mb-6">
+        <div className="rounded-2xl border border-emerald-700/60 bg-[#10251b] p-4 mb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-white">
@@ -482,6 +734,33 @@ export default function UserFeeManagementPage() {
               className="w-full sm:w-auto rounded-xl bg-emerald-600 hover:bg-emerald-500 px-5 py-3 font-bold text-white transition"
             >
               Review Fee Payments
+            </button>
+          </div>
+        </div>
+
+        {/* Verification Review Button */}
+        <div className="rounded-2xl border border-yellow-700/60 bg-[#10251b] p-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">
+                Identity & Payment Verification
+              </h2>
+
+              <p className="text-xs text-gray-400 mt-1">
+                Review user identity and payment method verification.
+              </p>
+
+              <p className="text-sm text-yellow-300 mt-2 font-semibold">
+                {verificationRequests.length} Pending / Under Review
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={openVerificationModal}
+              className="w-full sm:w-auto rounded-xl bg-yellow-600 hover:bg-yellow-500 px-5 py-3 font-bold text-white transition"
+            >
+              Review Verifications
             </button>
           </div>
         </div>
@@ -888,6 +1167,353 @@ export default function UserFeeManagementPage() {
                 className="w-full rounded-xl border border-[#315b43] bg-[#10251b] hover:bg-[#183a28] disabled:opacity-50 py-3 text-sm font-semibold text-gray-200 transition"
               >
                 Refresh Payment Requests
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Identity & Payment Verification Review Modal */}
+      {verificationOpen && (
+        <div
+          className="fixed inset-0 z-[110] bg-black/80 flex items-center justify-center p-3 sm:p-5"
+          onClick={(e) => {
+            if (
+              e.target === e.currentTarget &&
+              !verificationSaving
+            ) {
+              setVerificationOpen(false);
+            }
+          }}
+        >
+          <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl border border-yellow-700/60 bg-[#0b1b12] shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[#254c38] bg-[#10251b] p-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  Identity & Payment Verification
+                </h2>
+
+                <p className="text-xs text-gray-400 mt-1">
+                  Super Admin Verification Approval Center
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={verificationSaving}
+                onClick={() => setVerificationOpen(false)}
+                className="h-9 w-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-white text-xl disabled:opacity-50"
+                aria-label="Close verification modal"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {verificationError && (
+                <div className="rounded-xl border border-red-700 bg-red-950/50 p-3 text-sm text-red-300">
+                  {verificationError}
+                </div>
+              )}
+
+              {verificationSuccess && (
+                <div className="rounded-xl border border-emerald-700 bg-emerald-950/50 p-3 text-sm text-emerald-300">
+                  {verificationSuccess}
+                </div>
+              )}
+
+              {verificationLoading && (
+                <div className="py-8 text-center text-gray-400">
+                  Loading verification requests...
+                </div>
+              )}
+
+              {!verificationLoading &&
+                verificationRequests.length === 0 && (
+                  <div className="rounded-xl border border-[#254c38] bg-[#10251b] p-7 text-center">
+                    <p className="text-emerald-400 font-bold">
+                      No Pending Verifications
+                    </p>
+
+                    <p className="text-sm text-gray-400 mt-2">
+                      There are currently no verification requests waiting
+                      for review.
+                    </p>
+                  </div>
+                )}
+
+              {!verificationLoading &&
+                verificationRequests.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-300 mb-3">
+                      VERIFICATION REQUESTS ({verificationRequests.length})
+                    </h3>
+
+                    <div className="space-y-2">
+                      {verificationRequests.map((item) => (
+                        <button
+                          type="button"
+                          key={item.verification.id}
+                          onClick={() => selectVerification(item)}
+                          className={`w-full text-left rounded-xl border p-3 transition ${
+                            selectedVerification?.verification.id ===
+                            item.verification.id
+                              ? "border-yellow-500 bg-yellow-950/20"
+                              : "border-[#254c38] bg-[#10251b] hover:border-yellow-700"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-bold text-white text-sm truncate">
+                                {item.profile?.full_name || "Unknown User"}
+                              </p>
+
+                              <p className="text-xs text-gray-400 mt-1">
+                                Lottery ID:{" "}
+                                {item.profile?.lottery_id || "N/A"}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusColor(
+                                item.assessment?.payment_status || "pending"
+                              )}`}
+                            >
+                              {(item.assessment?.payment_status || "pending")
+                                .replaceAll("_", " ")
+                                .toUpperCase()}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <div>
+                              <p className="text-[10px] text-gray-500">
+                                IDENTITY
+                              </p>
+
+                              <span
+                                className={`inline-block mt-1 rounded-full px-2 py-1 text-[10px] font-bold ${statusColor(
+                                  item.verification.identity_status
+                                )}`}
+                              >
+                                {item.verification.identity_status
+                                  .replaceAll("_", " ")
+                                  .toUpperCase()}
+                              </span>
+                            </div>
+
+                            <div>
+                              <p className="text-[10px] text-gray-500">
+                                PAYMENT METHOD
+                              </p>
+
+                              <span
+                                className={`inline-block mt-1 rounded-full px-2 py-1 text-[10px] font-bold ${statusColor(
+                                  item.verification.payment_method_status
+                                )}`}
+                              >
+                                {item.verification.payment_method_status
+                                  .replaceAll("_", " ")
+                                  .toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {selectedVerification && (
+                <div className="rounded-xl border border-yellow-700/60 bg-[#10251b] p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-bold text-white">
+                      Verification Details
+                    </h3>
+
+                    <span className="text-[10px] text-gray-400">
+                      Assessment:{" "}
+                      {selectedVerification.verification.assessment_id.slice(
+                        0,
+                        8
+                      )}
+                      ...
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">User Name</p>
+                      <p className="text-sm text-white font-semibold mt-1">
+                        {selectedVerification.profile?.full_name || "N/A"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">Lottery ID</p>
+                      <p className="text-sm text-white font-semibold mt-1">
+                        {selectedVerification.profile?.lottery_id || "N/A"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">Winning Amount</p>
+                      <p className="text-sm text-emerald-400 font-bold mt-1">
+                        ৳
+                        {formatAmount(
+                          selectedVerification.assessment?.winning_amount
+                        )}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">Assessed Fee</p>
+                      <p className="text-sm text-emerald-400 font-bold mt-1">
+                        ৳
+                        {formatAmount(
+                          selectedVerification.assessment?.total_fee_amount
+                        )}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Overall Fee Status
+                      </p>
+
+                      <p className="text-sm text-white mt-1">
+                        {(
+                          selectedVerification.assessment?.payment_status ||
+                          "N/A"
+                        )
+                          .replaceAll("_", " ")
+                          .toUpperCase()}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Verification Submitted
+                      </p>
+
+                      <p className="text-sm text-white mt-1">
+                        {formatDate(
+                          selectedVerification.verification.created_at
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[#315b43] pt-4 space-y-3">
+                    <div>
+                      <label className="block text-sm font-bold text-white mb-2">
+                        Identity Verification Status
+                      </label>
+
+                      <select
+                        value={identityStatus}
+                        onChange={(e) =>
+                          setIdentityStatus(
+                            e.target.value as VerificationStatus
+                          )
+                        }
+                        disabled={verificationSaving}
+                        className="w-full rounded-xl border border-[#315b43] bg-[#071810] px-3 py-3 text-sm text-white outline-none focus:border-yellow-500 disabled:opacity-50"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2">
+                        Identity Admin Note (Optional)
+                      </label>
+
+                      <textarea
+                        value={identityNote}
+                        onChange={(e) => setIdentityNote(e.target.value)}
+                        rows={2}
+                        disabled={verificationSaving}
+                        placeholder="Write identity verification note..."
+                        className="w-full rounded-xl border border-[#315b43] bg-[#071810] p-3 text-sm text-white outline-none focus:border-yellow-500 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[#315b43] pt-4 space-y-3">
+                    <div>
+                      <label className="block text-sm font-bold text-white mb-2">
+                        Payment Method Verification Status
+                      </label>
+
+                      <select
+                        value={paymentMethodStatus}
+                        onChange={(e) =>
+                          setPaymentMethodStatus(
+                            e.target.value as VerificationStatus
+                          )
+                        }
+                        disabled={verificationSaving}
+                        className="w-full rounded-xl border border-[#315b43] bg-[#071810] px-3 py-3 text-sm text-white outline-none focus:border-yellow-500 disabled:opacity-50"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2">
+                        Payment Method Admin Note (Optional)
+                      </label>
+
+                      <textarea
+                        value={paymentMethodNote}
+                        onChange={(e) =>
+                          setPaymentMethodNote(e.target.value)
+                        }
+                        rows={2}
+                        disabled={verificationSaving}
+                        placeholder="Write payment method verification note..."
+                        className="w-full rounded-xl border border-[#315b43] bg-[#071810] p-3 text-sm text-white outline-none focus:border-yellow-500 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-yellow-800/50 bg-yellow-950/20 p-3">
+                    <p className="text-xs text-yellow-300 leading-5">
+                      Both verification statuses will be submitted together.
+                      The existing status of the other field is preserved
+                      unless you change it here.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={reviewVerification}
+                    disabled={verificationSaving}
+                    className="w-full rounded-xl bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 py-3 font-bold text-white transition"
+                  >
+                    {verificationSaving
+                      ? "Saving Verification..."
+                      : "Save Verification Review"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-[#254c38] p-4">
+              <button
+                type="button"
+                onClick={loadReviewVerifications}
+                disabled={verificationLoading || verificationSaving}
+                className="w-full rounded-xl border border-[#315b43] bg-[#10251b] hover:bg-[#183a28] disabled:opacity-50 py-3 text-sm font-semibold text-gray-200 transition"
+              >
+                Refresh Verification Requests
               </button>
             </div>
           </div>
