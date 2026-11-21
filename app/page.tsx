@@ -22,6 +22,7 @@ export default function LotteryHomePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [draws, setDraws] = useState<TicketDraw[]>([]);
   const [drawError, setDrawError] = useState("");
@@ -38,38 +39,43 @@ export default function LotteryHomePage() {
   const jackpotAmounts = [20000, 50000, 100000, 200000];
   const [activeJackpot, setActiveJackpot] = useState(0);
 
-  // Fetch User Profile and Available Draws
+  // Fetch Session, Profile and Available Draws
   useEffect(() => {
     let isMounted = true;
 
     const fetchData = async () => {
       try {
+        // Check existing session without requiring a logged-in user
         const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-        if (authError) {
-          throw authError;
+        if (sessionError) {
+          throw sessionError;
         }
 
-        if (!user) {
-          if (isMounted) {
-            setDrawError("Please log in to view available draws.");
+        const user = session?.user ?? null;
+
+        if (isMounted) {
+          setIsAuthenticated(!!user);
+          setProfile(null);
+        }
+
+        // Fetch profile only when a user is logged in
+        if (user) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+          if (isMounted && profileData) {
+            setProfile(profileData);
           }
-          return;
         }
 
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (isMounted && profileData) {
-          setProfile(profileData);
-        }
-
+        // Fetch available draws for both logged-in and guest users
         const { data: drawData, error: drawFetchError } =
           await supabase.rpc("ticket_available_draws");
 
@@ -256,7 +262,11 @@ export default function LotteryHomePage() {
 
   return (
     <div className="lottery-page-wrapper pb-20 bg-[#0d241e] min-h-screen">
-      <LotteryHeader userProfile={profile} />
+      <LotteryHeader
+        userProfile={profile}
+        initialAuthChecked={true}
+        initialIsLoggedIn={isAuthenticated}
+      />
 
       <div className="lottery-overlay">
         <main className="lottery-main pt-0 mt-0">
@@ -453,6 +463,11 @@ export default function LotteryHomePage() {
                         }
                         onClick={() => {
                           if (!isOpen) return;
+
+                          if (!isAuthenticated) {
+                            router.push("/Client/Login/");
+                            return;
+                          }
 
                           router.push(
                             `/Client/Ticket-Buy?draw_id=${encodeURIComponent(
