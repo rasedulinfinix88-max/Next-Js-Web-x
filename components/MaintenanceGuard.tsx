@@ -12,11 +12,18 @@ const ADMIN_PATH =
   "/admin-panel-rakib-aiman-tushar/maintenance-for-faster";
 
 function normalizePath(path: string) {
-  let result = path.toLowerCase();
+  let result = path.split("?")[0].toLowerCase();
 
-  if (result.startsWith(BASE_PATH.toLowerCase())) {
-    result = result.slice(BASE_PATH.length);
+  const basePath = BASE_PATH.toLowerCase().replace(/\/+$/, "");
+
+  if (
+    result === basePath ||
+    result.startsWith(basePath + "/")
+  ) {
+    result = result.slice(basePath.length);
   }
+
+  result = result.replace(/\/+$/, "");
 
   if (!result.startsWith("/")) {
     result = "/" + result;
@@ -66,46 +73,60 @@ export default function MaintenanceGuard({
     }
 
     setCheckingAdmin(true);
+    setIsAdmin(false);
 
-    const verifyAdmin = async (userId: string | null) => {
-      if (!userId) {
+    async function verifyAdmin() {
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError || !session?.user?.id) {
+          if (active) {
+            setIsAdmin(false);
+            setCheckingAdmin(false);
+          }
+          return;
+        }
+
+        const { data: profile, error: profileError } =
+          await supabase
+            .from("profiles")
+            .select("user_role, account_status")
+            .eq("id", session.user.id)
+            .maybeSingle();
+
+        if (!active) return;
+
+        const authorized =
+          !profileError &&
+          profile?.account_status === "active" &&
+          ["admin", "super_admin"].includes(profile?.user_role);
+
+        setIsAdmin(authorized);
+        setCheckingAdmin(false);
+
+      } catch {
         if (active) {
           setIsAdmin(false);
           setCheckingAdmin(false);
         }
-        return;
       }
+    }
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_role, account_status")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (!active) return;
-
-      const authorized =
-        !error &&
-        data?.account_status === "active" &&
-        ["admin", "super_admin"].includes(data?.user_role);
-
-      setIsAdmin(authorized);
-      setCheckingAdmin(false);
-    };
-
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        verifyAdmin(null);
-        return;
-      }
-
-      verifyAdmin(data.session?.user?.id ?? null);
-    });
+    verifyAdmin();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      verifyAdmin(session?.user?.id ?? null);
+    } = supabase.auth.onAuthStateChange(() => {
+      if (!active) return;
+
+      setCheckingAdmin(true);
+
+      Promise.resolve().then(() => {
+        if (active) verifyAdmin();
+      });
     });
 
     return () => {
@@ -124,7 +145,8 @@ export default function MaintenanceGuard({
 
     if (isAdminPage && isAdmin) return;
 
-    router.replace(`${BASE_PATH}/maintenance/`);
+    // Next.js automatically handles the configured basePath.
+    router.replace("/maintenance/");
   }, [
     isLoading,
     maintenanceMode,
