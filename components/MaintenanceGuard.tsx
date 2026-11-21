@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { supabase } from "../lib/supabase/client";
 import { useSiteSettings } from "../lib/SiteSettingsContext";
 
@@ -38,7 +38,6 @@ export default function MaintenanceGuard({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const { maintenanceMode, isLoading } = useSiteSettings();
 
@@ -145,8 +144,8 @@ export default function MaintenanceGuard({
 
     if (isAdminPage && isAdmin) return;
 
-    // Next.js automatically handles the configured basePath.
-    router.replace("/maintenance/");
+    window.location.replace(`${BASE_PATH}/maintenance/`);
+
   }, [
     isLoading,
     maintenanceMode,
@@ -155,7 +154,6 @@ export default function MaintenanceGuard({
     isAdminPage,
     checkingAdmin,
     isAdmin,
-    router,
   ]);
 
   if (isLoading) {
