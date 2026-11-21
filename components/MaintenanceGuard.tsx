@@ -6,13 +6,15 @@ import { usePathname } from "next/navigation";
 import { supabase } from "../lib/supabase/client";
 import { useSiteSettings } from "../lib/SiteSettingsContext";
 
+const BASE_PATH = "/Next-Js-Web-x";
+
 const ADMIN_PATH =
   "/admin-panel-rakib-aiman-tushar/maintenance-for-faster";
 
 function normalizePath(path: string) {
   let result = path.split("?")[0].toLowerCase();
 
-  const basePath = "/next-js-web-x";
+  const basePath = BASE_PATH.toLowerCase();
 
   if (
     result === basePath ||
@@ -56,7 +58,6 @@ export default function MaintenanceGuard({
     currentPath === ADMIN_PATH ||
     currentPath.startsWith(ADMIN_PATH + "/");
 
-  // Verify active admin or super_admin
   useEffect(() => {
     let active = true;
 
@@ -103,7 +104,6 @@ export default function MaintenanceGuard({
 
         setIsAdmin(authorized);
         setCheckingAdmin(false);
-
       } catch {
         if (active) {
           setIsAdmin(false);
@@ -114,25 +114,11 @@ export default function MaintenanceGuard({
 
     verifyAdmin();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      if (!active) return;
-
-      setCheckingAdmin(true);
-
-      Promise.resolve().then(() => {
-        if (active) verifyAdmin();
-      });
-    });
-
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
   }, [maintenanceMode, isAdminPage]);
 
-  // Redirect unauthorized visitors
   useEffect(() => {
     if (isLoading || !maintenanceMode) return;
 
@@ -142,9 +128,8 @@ export default function MaintenanceGuard({
 
     if (isAdminPage && isAdmin) return;
 
-    // Next.js automatically adds the configured basePath.
-    window.location.replace("/maintenance/");
-
+    // GitHub Pages-এর Project Base Path স্পষ্টভাবে যুক্ত করা হচ্ছে।
+    window.location.replace(`${BASE_PATH}/maintenance/`);
   }, [
     isLoading,
     maintenanceMode,
