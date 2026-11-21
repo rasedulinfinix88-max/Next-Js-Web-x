@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -444,7 +443,7 @@ export default function LotteryHomePage() {
                       <button
                         className="lotto-btn secondary"
                         onClick={() =>
-                          router.push("/Lottery/winners")
+                          router.push("/Winner-selection/")
                         }
                       >
                         Draw History
