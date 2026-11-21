@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase/client";
+import AdminMenu from "../../../components/admin/AdminMenu";
 
 type TicketDraw = {
   id: string;
@@ -97,6 +98,7 @@ export default function TicketDrawManagementPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const [drawDate, setDrawDate] = useState(getLocalDate());
   const [ticketPrice, setTicketPrice] = useState("50");
@@ -106,6 +108,20 @@ export default function TicketDrawManagementPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingAction, setPendingAction] =
     useState<PendingAction | null>(null);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+
+    try {
+      await client.auth.signOut();
+      router.replace("/admin-panel-rakib-aiman-tushar/Admin-login/");
+    } catch (error) {
+      console.error("Admin logout error:", error);
+      setLoggingOut(false);
+    }
+  }
 
   const loadDraws = useCallback(async () => {
     const { data, error } = await client.rpc("admin_list_ticket_draws");
@@ -402,6 +418,24 @@ export default function TicketDrawManagementPage() {
 
   return (
     <div className="tdm-page">
+      <header className="border-b border-[#24543b] bg-[#10251a] px-4 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-green-400">
+              GAZICASINO ADMIN
+            </h1>
+            <p className="mt-1 text-xs text-gray-400">
+              Ticket Draw Management
+            </p>
+          </div>
+
+          <AdminMenu
+            onLogout={handleLogout}
+            loggingOut={loggingOut}
+          />
+        </div>
+      </header>
+
       <main className="tdm-main">
         <div className="tdm-heading">
           <div>
@@ -721,7 +755,7 @@ export default function TicketDrawManagementPage() {
       <style jsx global>{`
         .tdm-page {
           min-height: 100vh;
-          background: #0d241e;
+          background: #07110d;
           color: #ffffff;
         }
 
@@ -735,7 +769,7 @@ export default function TicketDrawManagementPage() {
 
         .tdm-loading {
           min-height: 100vh;
-          background: #0d241e;
+          background: #07110d;
           display: flex;
           flex-direction: column;
           align-items: center;
