@@ -6,6 +6,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase/client";
 import { useSiteSettings } from "../lib/SiteSettingsContext";
 
+const BASE_PATH = "/Next-Js-Web-x";
+
+const ADMIN_PATH =
+  "/admin-panel-rakib-aiman-tushar/maintenance-for-faster";
+
+function normalizePath(path: string) {
+  let result = path.toLowerCase();
+
+  if (result.startsWith(BASE_PATH.toLowerCase())) {
+    result = result.slice(BASE_PATH.length);
+  }
+
+  if (!result.startsWith("/")) {
+    result = "/" + result;
+  }
+
+  return result || "/";
+}
+
 export default function MaintenanceGuard({
   children,
 }: {
@@ -19,7 +38,7 @@ export default function MaintenanceGuard({
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
-  const currentPath = pathname.toLowerCase();
+  const currentPath = normalizePath(pathname || "/");
 
   const isMaintenancePage =
     currentPath === "/maintenance" ||
@@ -30,21 +49,23 @@ export default function MaintenanceGuard({
     currentPath.startsWith("/client/login/");
 
   const isAdminPage =
-    currentPath ===
-      "/admin-panel-rakib-aiman-tushar/maintenance-for-faster" ||
-    currentPath.startsWith(
-      "/admin-panel-rakib-aiman-tushar/maintenance-for-faster/"
-    );
+    currentPath === ADMIN_PATH ||
+    currentPath.startsWith(ADMIN_PATH + "/");
 
   // Verify active admin or super_admin
   useEffect(() => {
+    let active = true;
+
     if (!maintenanceMode || !isAdminPage) {
       setCheckingAdmin(false);
       setIsAdmin(false);
-      return;
+
+      return () => {
+        active = false;
+      };
     }
 
-    let active = true;
+    setCheckingAdmin(true);
 
     const verifyAdmin = async (userId: string | null) => {
       if (!userId) {
@@ -61,15 +82,15 @@ export default function MaintenanceGuard({
         .eq("id", userId)
         .maybeSingle();
 
-      if (active) {
-        setIsAdmin(
-          !error &&
-            data?.account_status === "active" &&
-            ["admin", "super_admin"].includes(data?.user_role)
-        );
+      if (!active) return;
 
-        setCheckingAdmin(false);
-      }
+      const authorized =
+        !error &&
+        data?.account_status === "active" &&
+        ["admin", "super_admin"].includes(data?.user_role);
+
+      setIsAdmin(authorized);
+      setCheckingAdmin(false);
     };
 
     supabase.auth.getSession().then(({ data, error }) => {
@@ -84,7 +105,6 @@ export default function MaintenanceGuard({
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setCheckingAdmin(true);
       verifyAdmin(session?.user?.id ?? null);
     });
 
@@ -104,7 +124,7 @@ export default function MaintenanceGuard({
 
     if (isAdminPage && isAdmin) return;
 
-    router.replace("/maintenance");
+    router.replace(`${BASE_PATH}/maintenance/`);
   }, [
     isLoading,
     maintenanceMode,
@@ -116,7 +136,6 @@ export default function MaintenanceGuard({
     router,
   ]);
 
-  // Wait for settings
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#07130e] text-white">
@@ -125,17 +144,14 @@ export default function MaintenanceGuard({
     );
   }
 
-  // Normal website
   if (!maintenanceMode) {
     return <>{children}</>;
   }
 
-  // Maintenance page and login page remain accessible
   if (isMaintenancePage || isLoginPage) {
     return <>{children}</>;
   }
 
-  // Only verified active admins can access Admin Panel
   if (isAdminPage && checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#07130e] text-white">
