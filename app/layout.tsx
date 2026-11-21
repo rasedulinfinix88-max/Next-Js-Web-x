@@ -4,6 +4,7 @@ import "./globals.css";
 
 import { LanguageProvider } from "../lib/LanguageContext";
 import { SiteSettingsProvider } from "../lib/SiteSettingsContext";
+import MaintenanceGuard from "../components/MaintenanceGuard";
 
 export const metadata: Metadata = {
   title: {
@@ -34,7 +35,9 @@ export default function RootLayout({
       <body>
         <LanguageProvider>
           <SiteSettingsProvider>
-            {children}
+            <MaintenanceGuard>
+              {children}
+            </MaintenanceGuard>
           </SiteSettingsProvider>
         </LanguageProvider>
       </body>
