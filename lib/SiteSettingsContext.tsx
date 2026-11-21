@@ -26,7 +26,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (!error && data) {
-          setSiteName(data.site_name || "Casino");
+          setSiteName(data.site_name || "Lotto Dhaka");
           setMaintenanceMode(data.maintenance_mode || false);
           setMaintenanceMessage(data.maintenance_message || "We are currently under maintenance. Please check back later.");
         }
