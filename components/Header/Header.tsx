@@ -70,49 +70,101 @@ const Icons = {
   ),
 };
 
-export default function LotteryHeader({ userProfile }: { userProfile?: any }) {
+type LotteryHeaderProps = {
+  userProfile?: any;
+  initialAuthChecked?: boolean;
+  initialIsLoggedIn?: boolean;
+};
+
+export default function LotteryHeader({
+  userProfile,
+  initialAuthChecked = false,
+  initialIsLoggedIn = false,
+}: LotteryHeaderProps) {
   const router = useRouter();
   const { language, setLanguage, t } = useLanguage();
   const { siteName } = useSiteSettings();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    initialAuthChecked ? initialIsLoggedIn : false
+  );
   const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const fetchNotifications = async (userId: string) => {
+      const { data, error } = await supabase
+        .from("user_notifications")
+        .select("id, user_id")
+        .or(`user_id.eq.${userId},user_id.is.null`)
+        .eq("is_read", false);
+
+      if (!isMounted) return;
+
+      if (!error && data) {
+        const readBroadcasts = JSON.parse(
+          localStorage.getItem("read_broadcast_notifs") || "[]"
+        );
+
+        const actualUnread = data.filter((notif) => {
+          if (notif.user_id === null) {
+            return !readBroadcasts.includes(notif.id);
+          }
+          return true;
+        });
+
+        setHasUnread(actualUnread.length > 0);
+      }
+    };
+
     const checkUserAndNotifications = async () => {
+      // Main page has already checked the session during its loading screen
+      if (initialAuthChecked) {
+        setIsLoggedIn(initialIsLoggedIn);
+
+        if (initialIsLoggedIn) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (isMounted && session?.user) {
+            await fetchNotifications(session.user.id);
+          }
+        } else {
+          setHasUnread(false);
+        }
+
+        return;
+      }
+
+      // Other pages continue to check their own session
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
+      if (!isMounted) return;
+
       setIsLoggedIn(!!user);
 
       if (user) {
-        const { data, error } = await supabase
-          .from("user_notifications")
-          .select("id, user_id")
-          .or(`user_id.eq.${user.id},user_id.is.null`)
-          .eq("is_read", false);
-
-        if (!error && data) {
-          const readBroadcasts = JSON.parse(
-            localStorage.getItem("read_broadcast_notifs") || "[]"
-          );
-
-          const actualUnread = data.filter((notif) => {
-            if (notif.user_id === null) {
-              return !readBroadcasts.includes(notif.id);
-            }
-            return true;
-          });
-
-          setHasUnread(actualUnread.length > 0);
-        }
+        await fetchNotifications(user.id);
+      } else {
+        setHasUnread(false);
       }
     };
 
     checkUserAndNotifications();
-  }, [userProfile]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    userProfile,
+    initialAuthChecked,
+    initialIsLoggedIn,
+  ]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
