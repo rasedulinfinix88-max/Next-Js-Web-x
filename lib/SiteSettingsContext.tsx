@@ -15,6 +15,7 @@ interface SiteSettings {
   logoUrl: string;
   maintenanceMode: boolean;
   maintenanceMessage: string;
+  isLoading: boolean;
 }
 
 const SiteSettingsContext = createContext<SiteSettings | undefined>(undefined);
@@ -30,6 +31,7 @@ export function SiteSettingsProvider({
   const [maintenanceMessage, setMaintenanceMessage] = useState(
     "ওয়েবসাইটে সাময়িক রক্ষণাবেক্ষণের কাজ চলছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।"
   );
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,6 +70,10 @@ export function SiteSettingsProvider({
         }
       } catch (err) {
         console.error("Failed to load site settings:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -85,6 +91,7 @@ export function SiteSettingsProvider({
         logoUrl,
         maintenanceMode,
         maintenanceMessage,
+        isLoading,
       }}
     >
       {children}
