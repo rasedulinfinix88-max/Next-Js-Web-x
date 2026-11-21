@@ -250,7 +250,7 @@ function LoginForm() {
             type="submit"
             disabled={loading}
             className="w-full font-bold text-sm py-2.5 rounded-lg mt-2 transition-colors disabled:opacity-50 flex justify-center items-center"
-            style={{ backgroundColor: "#00E701", color: "#000", height: "44px" }}
+            style={{ backgroundColor: "#218653", color: "#000", height: "44px" }}
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
