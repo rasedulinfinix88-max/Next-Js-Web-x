@@ -30,6 +30,8 @@ export default function MaintenanceAdminPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (isLoading) return;
+
     let active = true;
 
     async function verifyAdmin() {
@@ -38,34 +40,52 @@ export default function MaintenanceAdminPage() {
           await supabase.auth.getSession();
 
         if (sessionError || !sessionData.session) {
-          router.replace("/Client/Login/");
+          if (active) {
+            router.replace(
+              maintenanceMode ? "/maintenance/" : "/Client/Login/"
+            );
+          }
           return;
         }
 
         const userId = sessionData.session.user.id;
 
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("user_role, account_status")
-          .eq("id", userId)
-          .maybeSingle();
+        const { data: profile, error: profileError } =
+          await supabase
+            .from("profiles")
+            .select("user_role, account_status")
+            .eq("id", userId)
+            .maybeSingle();
 
-        if (
-          profileError ||
-          !profile ||
-          profile.account_status !== "active" ||
-          !["admin", "super_admin"].includes(profile.user_role)
-        ) {
-          router.replace("/");
+        if (!active) return;
+
+        const isAuthorized =
+          !profileError &&
+          !!profile &&
+          profile.account_status === "active" &&
+          ["admin", "super_admin"].includes(profile.user_role);
+
+        if (!isAuthorized) {
+          setAuthorized(false);
+          setChecking(false);
+
+          router.replace(
+            maintenanceMode ? "/maintenance/" : "/"
+          );
           return;
         }
 
-        if (active) {
-          setAuthorized(true);
-          setChecking(false);
-        }
+        setAuthorized(true);
+        setChecking(false);
       } catch {
-        router.replace("/");
+        if (active) {
+          setAuthorized(false);
+          setChecking(false);
+
+          router.replace(
+            maintenanceMode ? "/maintenance/" : "/"
+          );
+        }
       }
     }
 
@@ -74,7 +94,7 @@ export default function MaintenanceAdminPage() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, isLoading, maintenanceMode]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -239,9 +259,11 @@ export default function MaintenanceAdminPage() {
 
             <div className="rounded-xl border border-[#234532] bg-[#10251a] p-5">
               <p className="text-sm text-gray-400">Website Status</p>
-              <h3 className={`mt-3 text-xl font-bold ${
-                maintenance ? "text-yellow-400" : "text-green-400"
-              }`}>
+              <h3
+                className={`mt-3 text-xl font-bold ${
+                  maintenance ? "text-yellow-400" : "text-green-400"
+                }`}
+              >
                 {maintenance ? "Maintenance ON" : "Online"}
               </h3>
               <p className="mt-2 text-xs text-gray-500">
