@@ -32,27 +32,37 @@ export function SiteSettingsProvider({
   );
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchSettings = async () => {
       try {
-        const { data, error } = await supabase
-          .from("site_settings")
-          .select(
-            "site_name, logo_url, maintenance_mode, maintenance_message"
-          )
-          .eq("id", 1)
-          .single();
+        const { data, error } = await supabase.functions.invoke(
+          "site-manager",
+          {
+            body: {
+              action: "get_settings",
+            },
+          }
+        );
 
         if (error) {
           console.error("Failed to load site settings:", error);
           return;
         }
 
-        if (data) {
-          setSiteName(data.site_name || "Lotto Dhaka");
-          setLogoUrl(data.logo_url || "");
-          setMaintenanceMode(data.maintenance_mode ?? false);
+        if (!data?.success || !data?.settings) {
+          console.error("Invalid site settings response:", data);
+          return;
+        }
+
+        if (isMounted) {
+          const settings = data.settings;
+
+          setSiteName(settings.site_name || "Lotto Dhaka");
+          setLogoUrl(settings.logo_url || "");
+          setMaintenanceMode(settings.maintenance_mode ?? false);
           setMaintenanceMessage(
-            data.maintenance_message ||
+            settings.maintenance_message ||
               "ওয়েবসাইটে সাময়িক রক্ষণাবেক্ষণের কাজ চলছে। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।"
           );
         }
@@ -62,6 +72,10 @@ export function SiteSettingsProvider({
     };
 
     fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
