@@ -43,11 +43,14 @@ type JackpotDraw = {
   winners: JackpotWinner[];
 };
 
+type HistoryTab = "jackpot" | "winner";
+
 export default function WinnerSelectionPage() {
   const router = useRouter();
 
   const [draws, setDraws] = useState<Draw[]>([]);
   const [jackpotDraws, setJackpotDraws] = useState<JackpotDraw[]>([]);
+  const [activeTab, setActiveTab] = useState<HistoryTab>("jackpot");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -75,7 +78,6 @@ export default function WinnerSelectionPage() {
         );
       }
 
-      // Existing Winner History
       const sortedDraws = [...data.draws]
         .filter((draw: Draw) => Array.isArray(draw.winners))
         .sort(
@@ -84,7 +86,6 @@ export default function WinnerSelectionPage() {
             new Date(a.draw_date).getTime()
         );
 
-      // New Jackpot Winning History
       const sortedJackpotDraws: JackpotDraw[] =
         Array.isArray(data.jackpot_draws)
           ? [...data.jackpot_draws]
@@ -245,207 +246,257 @@ export default function WinnerSelectionPage() {
       ) : (
         <div className="winner-container">
 
-          {error && (
+          {error ? (
             <div className="error-box">
               <p>{error}</p>
               <button onClick={loadWinners}>
                 TRY AGAIN
               </button>
             </div>
-          )}
-
-          {!error && (
+          ) : (
             <>
-              {/* JACKPOT WINNING HISTORY */}
+              {/* HISTORY BUTTONS */}
 
-              <div className="history-section-title">
-                <span>★ JACKPOT</span>
-                <h1>JACKPOT WINNING HISTORY</h1>
-                <p>Official Published Jackpot Winners</p>
+              <div className="history-tabs">
+                <button
+                  className={`history-tab jackpot-tab ${
+                    activeTab === "jackpot" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("jackpot")}
+                >
+                  <span className="tab-star">★</span>
+                  <span>JACKPOT WINNING HISTORY</span>
+                  <small>{jackpotDraws.length}</small>
+                </button>
+
+                <button
+                  className={`history-tab winner-tab ${
+                    activeTab === "winner" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTab("winner")}
+                >
+                  <span className="tab-star">★</span>
+                  <span>WINNER SELECTION HISTORY</span>
+                  <small>{draws.length}</small>
+                </button>
               </div>
 
-              {jackpotDraws.length === 0 ? (
-                <div className="message-box jackpot-empty">
-                  No published Jackpot winners available yet.
-                </div>
-              ) : (
-                jackpotDraws.map((draw) => (
-                  <section
-                    className="draw-card jackpot-card"
-                    key={`jackpot-${draw.draw_id}`}
-                  >
-                    <div className="jackpot-heading">
-                      <div>
-                        <span className="jackpot-label">
-                          ★ JACKPOT WINNER
-                        </span>
-                        <h2>
-                          {draw.category || "Jackpot Draw"}
-                        </h2>
-                        <p>
-                          {formatJackpotDate(draw.draw_date)}
-                        </p>
-                      </div>
+              {/* JACKPOT HISTORY */}
 
-                      <div className="prize-pool">
-                        <span>JACKPOT PRIZE</span>
-                        <strong>
-                          {formatMoney(draw.total_jackpot)}
-                        </strong>
-                      </div>
+              {activeTab === "jackpot" && (
+                <section className="history-content">
+                  <div className="section-heading jackpot-heading-title">
+                    <span>★ JACKPOT RESULTS</span>
+                    <h1>JACKPOT WINNING HISTORY</h1>
+                    <p>Official Published Jackpot Winners</p>
+                  </div>
+
+                  {jackpotDraws.length === 0 ? (
+                    <div className="message-box">
+                      No published Jackpot winners available yet.
                     </div>
+                  ) : (
+                    <div className="history-grid">
+                      {jackpotDraws.map((draw) => (
+                        <section
+                          className="draw-card"
+                          key={`jackpot-${draw.draw_id}`}
+                        >
+                          <div className="draw-header">
+                            <div>
+                              <span className="draw-label jackpot-label">
+                                ★ JACKPOT WINNER
+                              </span>
 
-                    <div className="jackpot-details">
-                      <div>
-                        <span>TICKET PRICE</span>
-                        <strong>
-                          {formatMoney(draw.ticket_price)}
-                        </strong>
-                      </div>
+                              <h2>
+                                {draw.category || "Jackpot Draw"}
+                              </h2>
 
-                      <div>
-                        <span>TICKETS SOLD</span>
-                        <strong>
-                          {Number(
-                            draw.total_tickets_sold || 0
-                          ).toLocaleString("en-IN")}
-                        </strong>
-                      </div>
-                    </div>
+                              <span className="draw-date">
+                                {formatJackpotDate(draw.draw_date)}
+                              </span>
+                            </div>
 
-                    <div className="winner-table-header">
-                      <span>WINNER</span>
-                      <span>TICKET DETAILS</span>
-                    </div>
-
-                    {draw.winners.map((winner, index) => (
-                      <div
-                        className="winner-row jackpot-winner-row"
-                        key={winner.ticket_id || index}
-                      >
-                        <div className="winner-info">
-                          <div className="winner-avatar jackpot-avatar">
-                            ★
+                            <div className="prize-pool">
+                              <span>JACKPOT PRIZE</span>
+                              <strong>
+                                {formatMoney(draw.total_jackpot)}
+                              </strong>
+                            </div>
                           </div>
 
-                          <div className="winner-name">
-                            <strong>
-                              {winner.winner_name_masked}
-                            </strong>
-                            <span>JACKPOT WINNER</span>
+                          <div className="jackpot-details">
+                            <div>
+                              <span>TICKET PRICE</span>
+                              <strong>
+                                {formatMoney(draw.ticket_price)}
+                              </strong>
+                            </div>
+
+                            <div>
+                              <span>TICKETS SOLD</span>
+                              <strong>
+                                {Number(
+                                  draw.total_tickets_sold || 0
+                                ).toLocaleString("en-IN")}
+                              </strong>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="ticket-info">
-                          <strong>
-                            #{winner.ticket_number}
-                          </strong>
+                          <div className="winner-table-header">
+                            <span>WINNER</span>
+                            <span>TICKET DETAILS</span>
+                          </div>
 
-                          <span>
-                            Ticket: {formatMoney(winner.ticket_price)}
-                          </span>
+                          {draw.winners.map((winner, index) => (
+                            <div
+                              className="winner-row"
+                              key={winner.ticket_id || index}
+                            >
+                              <div className="winner-info">
+                                <div className="winner-avatar jackpot-avatar">
+                                  ★
+                                </div>
 
-                          <span className="ticket-id">
-                            Ticket ID: {winner.ticket_id}
-                          </span>
+                                <div className="winner-name">
+                                  <strong>
+                                    {winner.winner_name_masked}
+                                  </strong>
+                                  <span>JACKPOT WINNER</span>
+                                </div>
+                              </div>
 
-                          <span className="jackpot-prize">
-                            Prize: {formatMoney(winner.prize_amount)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                              <div className="ticket-info">
+                                <strong>
+                                  #{winner.ticket_number}
+                                </strong>
 
-                    <div className="draw-footer">
-                      Total Winners: {draw.winners.length}
+                                <span>
+                                  Ticket: {formatMoney(winner.ticket_price)}
+                                </span>
+
+                                <span className="ticket-id">
+                                  Ticket ID: {winner.ticket_id}
+                                </span>
+
+                                <span className="jackpot-prize">
+                                  Prize: {formatMoney(winner.prize_amount)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="draw-footer">
+                            Total Winners: {draw.winners.length}
+                          </div>
+                        </section>
+                      ))}
                     </div>
-                  </section>
-                ))
+                  )}
+                </section>
               )}
 
-              {/* EXISTING WINNER HISTORY - PRESERVED */}
+              {/* EXISTING WINNER SELECTION HISTORY */}
 
-              <div className="history-section-title old-history-title">
-                <span>★ WINNER RESULTS</span>
-                <h1>WINNER SELECTION HISTORY</h1>
-                <p>Previous Draw Results</p>
-              </div>
+              {activeTab === "winner" && (
+                <section className="history-content">
+                  <div className="section-heading">
+                    <span>★ WINNER RESULTS</span>
+                    <h1>WINNER SELECTION HISTORY</h1>
+                    <p>Previous Draw Results</p>
+                  </div>
 
-              {draws.length === 0 ? (
-                <div className="message-box">
-                  No confirmed winners available yet.
-                </div>
-              ) : (
-                draws.map((draw) => (
-                  <section
-                    className="draw-card"
-                    key={draw.draw_id}
-                  >
-                    <div className="draw-header">
-                      <div>
-                        <span className="draw-label">
-                          COMPLETED DRAW
-                        </span>
-                        <h2>{formatDate(draw.draw_date)}</h2>
-                      </div>
-
-                      <div className="prize-pool">
-                        <span>PRIZE POOL</span>
-                        <strong>
-                          {formatMoney(draw.total_jackpot)}
-                        </strong>
-                      </div>
+                  {draws.length === 0 ? (
+                    <div className="message-box">
+                      No confirmed winners available yet.
                     </div>
-
-                    <div className="winner-table-header">
-                      <span>WINNER</span>
-                      <span>TICKET DETAILS</span>
-                    </div>
-
-                    {draw.winners.map((winner, index) => (
-                      <div
-                        className="winner-row"
-                        key={winner.ticket_id || index}
-                      >
-                        <div className="winner-info">
-                          <div className="winner-avatar">
-                            ★
-                          </div>
-
-                          <div className="winner-name">
-                            <strong>
-                              {winner.winner_name_masked}
-                            </strong>
-                            <span>WINNER</span>
-                          </div>
-                        </div>
-
-                        <div className="ticket-info">
-                          <strong>
-                            #{winner.ticket_number}
-                          </strong>
-                          <span>
-                            Ticket: {formatMoney(winner.ticket_price)}
-                          </span>
-                        </div>
-
-                        <button
-                          className="verify-button"
-                          disabled={!winner.token}
-                          onClick={() =>
-                            verifyTicket(winner.token)
-                          }
+                  ) : (
+                    <div className="history-grid">
+                      {draws.map((draw) => (
+                        <section
+                          className="draw-card"
+                          key={draw.draw_id}
                         >
-                          VERIFY DRAWS
-                        </button>
-                      </div>
-                    ))}
+                          <div className="draw-header">
+                            <div>
+                              <span className="draw-label">
+                                COMPLETED DRAW
+                              </span>
 
-                    <div className="draw-footer">
-                      Total Winners: {draw.winners.length}
+                              <h2>Winner Draw</h2>
+
+                              <span className="draw-date">
+                                {formatDate(draw.draw_date)}
+                              </span>
+                            </div>
+
+                            <div className="prize-pool">
+                              <span>PRIZE POOL</span>
+                              <strong>
+                                {formatMoney(draw.total_jackpot)}
+                              </strong>
+                            </div>
+                          </div>
+
+                          <div className="winner-table-header">
+                            <span>WINNER</span>
+                            <span>TICKET DETAILS</span>
+                          </div>
+
+                          {draw.winners.map((winner, index) => (
+                            <div
+                              className="winner-row"
+                              key={winner.ticket_id || index}
+                            >
+                              <div className="winner-info">
+                                <div className="winner-avatar">
+                                  ★
+                                </div>
+
+                                <div className="winner-name">
+                                  <strong>
+                                    {winner.winner_name_masked}
+                                  </strong>
+                                  <span>WINNER</span>
+                                </div>
+                              </div>
+
+                              <div className="ticket-info">
+                                <strong>
+                                  #{winner.ticket_number}
+                                </strong>
+
+                                <span>
+                                  Ticket: {formatMoney(winner.ticket_price)}
+                                </span>
+
+                                {winner.prize_amount !== undefined && (
+                                  <span className="jackpot-prize">
+                                    Prize: {formatMoney(winner.prize_amount)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <button
+                                className="verify-button"
+                                disabled={!winner.token}
+                                onClick={() =>
+                                  verifyTicket(winner.token)
+                                }
+                              >
+                                VERIFY DRAWS
+                              </button>
+                            </div>
+                          ))}
+
+                          <div className="draw-footer">
+                            Total Winners: {draw.winners.length}
+                          </div>
+                        </section>
+                      ))}
                     </div>
-                  </section>
-                ))
+                  )}
+                </section>
               )}
             </>
           )}
@@ -464,7 +515,7 @@ export default function WinnerSelectionPage() {
         }
 
         .winner-container {
-          max-width: 850px;
+          max-width: 1100px;
           margin: 0 auto;
           padding: 22px 14px 30px;
         }
@@ -547,43 +598,115 @@ export default function WinnerSelectionPage() {
           }
         }
 
-        .history-section-title {
-          text-align: center;
-          padding: 12px 8px 20px;
+        /* HISTORY TABS */
+
+        .history-tabs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-bottom: 24px;
         }
 
-        .history-section-title > span {
+        .history-tab {
+          min-height: 58px;
+          padding: 10px 8px;
+          border: 1px solid #34483a;
+          border-radius: 9px;
+          background: #19231d;
+          color: #9aafa0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.3px;
+          cursor: pointer;
+          transition: 0.2s ease;
+        }
+
+        .history-tab .tab-star {
+          font-size: 14px;
+        }
+
+        .history-tab small {
+          min-width: 19px;
+          height: 19px;
+          padding: 0 5px;
+          border-radius: 20px;
+          background: #29382e;
+          color: #c4d4c9;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+        }
+
+        .jackpot-tab.active {
+          background: #3b3020;
+          border-color: #b28a3d;
+          color: #f5cf70;
+        }
+
+        .jackpot-tab.active small {
+          background: #665329;
+          color: #ffffff;
+        }
+
+        .winner-tab.active {
+          background: #20372a;
+          border-color: #49df91;
+          color: #56e69a;
+        }
+
+        .winner-tab.active small {
+          background: #315b40;
+          color: #ffffff;
+        }
+
+        .section-heading {
+          text-align: center;
+          padding: 8px 8px 20px;
+        }
+
+        .section-heading > span {
           color: #56e69a;
           font-size: 10px;
           font-weight: 900;
           letter-spacing: 2px;
         }
 
-        .history-section-title h1 {
+        .jackpot-heading-title > span {
+          color: #f5cf70;
+        }
+
+        .section-heading h1 {
           font-size: 19px;
           margin: 8px 0 5px;
           font-weight: 900;
           letter-spacing: 0.5px;
         }
 
-        .history-section-title p {
+        .section-heading p {
           color: #91a99a;
           font-size: 11px;
           margin: 0;
         }
 
-        .old-history-title {
-          margin-top: 28px;
-          border-top: 1px solid #293a30;
-          padding-top: 25px;
+        /* GRID CARDS */
+
+        .history-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 18px;
         }
 
         .draw-card {
           background: #19231d;
           border: 1px solid #2b3b31;
           border-radius: 12px;
-          margin-bottom: 20px;
           overflow: hidden;
+          min-width: 0;
         }
 
         .draw-header {
@@ -603,13 +726,26 @@ export default function WinnerSelectionPage() {
           letter-spacing: 1.3px;
         }
 
+        .jackpot-label {
+          color: #f5cf70;
+        }
+
         .draw-header h2 {
-          font-size: 18px;
-          margin: 6px 0 0;
+          font-size: 17px;
+          margin: 6px 0 4px;
+          overflow-wrap: anywhere;
+        }
+
+        .draw-date {
+          display: block;
+          color: #a9c4b1;
+          font-size: 10px;
+          margin-top: 5px;
         }
 
         .prize-pool {
           text-align: right;
+          flex-shrink: 0;
         }
 
         .prize-pool span {
@@ -622,8 +758,44 @@ export default function WinnerSelectionPage() {
         .prize-pool strong {
           display: block;
           color: #56e69a;
-          font-size: 17px;
+          font-size: 16px;
           margin-top: 5px;
+        }
+
+        .jackpot-card {
+          border-color: #806b35;
+        }
+
+        .jackpot-card .draw-header {
+          background: linear-gradient(135deg, #3b3020, #263b2c);
+          border-bottom-color: #806b35;
+        }
+
+        .jackpot-card .prize-pool strong {
+          color: #f5cf70;
+        }
+
+        .jackpot-details {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          padding: 13px 15px;
+          gap: 12px;
+          background: #1c2921;
+          border-bottom: 1px solid #344338;
+        }
+
+        .jackpot-details span {
+          display: block;
+          font-size: 9px;
+          color: #9aab9f;
+          font-weight: 800;
+        }
+
+        .jackpot-details strong {
+          display: block;
+          margin-top: 5px;
+          font-size: 13px;
+          color: #ffffff;
         }
 
         .winner-table-header {
@@ -666,6 +838,15 @@ export default function WinnerSelectionPage() {
           font-size: 17px;
         }
 
+        .jackpot-avatar {
+          background: #665329;
+          color: #ffdf80;
+        }
+
+        .winner-name {
+          min-width: 0;
+        }
+
         .winner-name strong {
           display: block;
           font-size: 13px;
@@ -697,6 +878,16 @@ export default function WinnerSelectionPage() {
           font-size: 10px;
           margin-top: 5px;
           overflow-wrap: anywhere;
+        }
+
+        .ticket-info .ticket-id {
+          color: #b6c7bb;
+          font-size: 9px;
+        }
+
+        .ticket-info .jackpot-prize {
+          color: #f5cf70;
+          font-weight: 900;
         }
 
         .verify-button {
@@ -749,107 +940,59 @@ export default function WinnerSelectionPage() {
           border-radius: 6px;
         }
 
-        /* JACKPOT HISTORY STYLES */
-
-        .jackpot-card {
-          border-color: #806b35;
-        }
-
-        .jackpot-heading {
-          padding: 17px 15px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          background: linear-gradient(135deg, #3b3020, #263b2c);
-          border-bottom: 1px solid #806b35;
-        }
-
-        .jackpot-label {
-          color: #f5cf70;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 1.3px;
-        }
-
-        .jackpot-heading h2 {
-          font-size: 18px;
-          margin: 7px 0 4px;
-          color: #ffffff;
-        }
-
-        .jackpot-heading p {
-          color: #c4b995;
-          font-size: 11px;
-          margin: 0;
-        }
-
-        .jackpot-heading .prize-pool strong {
-          color: #f5cf70;
-        }
-
-        .jackpot-details {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          padding: 13px 15px;
-          gap: 12px;
-          background: #1c2921;
-          border-bottom: 1px solid #344338;
-        }
-
-        .jackpot-details span {
-          display: block;
-          font-size: 9px;
-          color: #9aab9f;
-          font-weight: 800;
-        }
-
-        .jackpot-details strong {
-          display: block;
-          margin-top: 5px;
-          font-size: 13px;
-          color: #ffffff;
-        }
-
-        .jackpot-avatar {
-          background: #665329;
-          color: #ffdf80;
-        }
-
-        .jackpot-winner-row {
-          grid-template-columns: 1fr 1fr;
-        }
-
-        .ticket-id {
-          color: #b6c7bb !important;
-          font-size: 9px !important;
-          overflow-wrap: anywhere;
-        }
-
-        .jackpot-prize {
-          color: #f5cf70 !important;
-          font-weight: 900;
-        }
-
-        .jackpot-empty {
-          border-color: #665329;
-        }
-
         @media (min-width: 600px) {
           .winner-container {
             padding: 30px 22px;
           }
 
-          .winner-row {
-            grid-template-columns: 1fr 1fr 150px;
+          .history-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .jackpot-winner-row {
-            grid-template-columns: 1fr 1fr;
+          .history-tab {
+            min-height: 64px;
+            font-size: 12px;
+          }
+
+          .winner-row {
+            grid-template-columns: 1fr 1fr 125px;
           }
 
           .verify-button {
             grid-column: auto;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .history-tabs {
+            gap: 7px;
+          }
+
+          .history-tab {
+            font-size: 9px;
+            gap: 4px;
+            padding: 9px 5px;
+          }
+
+          .history-tab .tab-star {
+            display: none;
+          }
+
+          .draw-header {
+            padding: 14px 11px;
+          }
+
+          .draw-header h2 {
+            font-size: 15px;
+          }
+
+          .prize-pool strong {
+            font-size: 14px;
+          }
+
+          .winner-row {
+            padding: 12px 10px;
+            gap: 8px;
           }
         }
       `}</style>
