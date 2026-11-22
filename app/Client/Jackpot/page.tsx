@@ -3,9 +3,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase/client";
-import LotteryHeader from "../../components/Header/Header";
-import LotteryFooter from "../../components/Footer/Footer";
+import { supabase } from "../../../lib/supabase/client";
+import LotteryHeader from "../../../components/Header/Header";
+import LotteryFooter from "../../../components/Footer/Footer";
+
 
 type JackpotDraw = {
   id: string;
