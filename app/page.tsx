@@ -39,6 +39,7 @@ export default function LotteryHomePage() {
   const [activeJackpot, setActiveJackpot] = useState(0);
 
   // Fetch Session, Profile and Available Draws
+  // Existing Lottery data source and authentication logic are preserved.
   useEffect(() => {
     let isMounted = true;
 
@@ -105,7 +106,7 @@ export default function LotteryHomePage() {
     };
   }, []);
 
-  // Jackpot Slider
+  // Existing Jackpot banner slider logic is preserved.
   useEffect(() => {
     const sliderInterval = setInterval(() => {
       setActiveJackpot(
@@ -132,7 +133,7 @@ export default function LotteryHomePage() {
     setCurrentDate(formattedDate);
   }, []);
 
-  // Countdown Timer
+  // Existing daily countdown logic is preserved.
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date();
@@ -146,18 +147,10 @@ export default function LotteryHomePage() {
 
       const diff = target.getTime() - now.getTime();
 
-      const d = Math.floor(
-        diff / (1000 * 60 * 60 * 24)
-      );
-      const h = Math.floor(
-        (diff / (1000 * 60 * 60)) % 24
-      );
-      const m = Math.floor(
-        (diff / 1000 / 60) % 60
-      );
-      const s = Math.floor(
-        (diff / 1000) % 60
-      );
+      const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
 
       setTimeLeft({
         days: d.toString().padStart(2, "0"),
@@ -174,7 +167,7 @@ export default function LotteryHomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Draw Date Formatter
+  // Existing Draw Date Formatter
   const formatDrawDate = (date: string) => {
     if (!date) return currentDate;
 
@@ -194,7 +187,7 @@ export default function LotteryHomePage() {
       .replace(",", "");
   };
 
-  // Lottery Card Titles
+  // Existing Lottery Card Titles
   const getDrawTitle = (price: number) => {
     const titles: Record<
       number,
@@ -231,292 +224,331 @@ export default function LotteryHomePage() {
     );
   };
 
+  const formatMoney = (amount: number) =>
+    Number(amount || 0).toLocaleString("en-IN");
+
+  const getStatus = (status: string) => {
+    if (status === "open") return "Sales Open";
+    if (status === "upcoming") return "Upcoming";
+    if (status === "closed") return "Sales Closed";
+    if (status === "drawn") return "Winner Selected";
+    if (status === "published") return "Result Published";
+    if (status === "cancelled") return "Cancelled";
+    return status || "Not Scheduled";
+  };
+
   // Loading Screen
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0d241e] flex flex-col items-center justify-center">
-        <svg
-          className="w-12 h-12 text-white animate-spin"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"
-          />
-        </svg>
-
-        <p className="text-white mt-4 font-bold tracking-widest animate-pulse text-[11px]">
-          LOADING...
+      <div className="min-h-screen bg-[#071510] flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#d6a94d] border-t-transparent rounded-full animate-spin" />
+        <p className="text-white mt-4 text-xs font-bold tracking-widest">
+          LOADING LOTTERY...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="lottery-page-wrapper pb-20 bg-[#0d241e] min-h-screen">
+    <div className="min-h-screen bg-[#071510] text-white pb-20">
       <LotteryHeader
         userProfile={profile}
         initialAuthChecked={true}
         initialIsLoggedIn={isAuthenticated}
       />
 
-      <div className="lottery-overlay">
-        <main className="lottery-main pt-0 mt-0">
+      <main className="max-w-5xl mx-auto px-3 pt-5">
+        {/* Main Banner - Jackpot page visual style */}
+        <section className="relative overflow-hidden rounded-2xl border border-[#b58b43]/40 bg-gradient-to-br from-[#183b2c] via-[#10291f] to-[#071510] p-5 mb-6">
+          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-[#d6a94d]/10 blur-3xl" />
+          <div className="absolute -left-12 -bottom-16 w-40 h-40 rounded-full bg-[#d6a94d]/10 blur-3xl" />
 
-          {/* Jackpot Slider */}
-          <div
-            className="jackpot-slider-wrapper"
-            style={{
-              backgroundImage:
-                "url(https://i.ibb.co.com/6J70LMrp/file-000000002204821192cb3561d5e7a1d3.png)",
-            }}
-          >
-            <div className="jackpot-overlay"></div>
+          <div className="relative z-10 text-center">
+            <div className="text-[#e9c477] text-xs font-bold tracking-[4px] mb-3">
+              DAILY GRAND DRAW
+            </div>
 
-            <div
-              className="jackpot-track"
-              style={{
-                transform: `translateX(-${activeJackpot * 100}%)`,
-              }}
-            >
-              {jackpotAmounts.map((amount, index) => (
-                <div key={index} className="jackpot-slide">
-                  <div className="jackpot-title">
-                    TODAY'S JACKPOT
+            <h1 className="text-3xl sm:text-4xl font-black tracking-wide">
+              LOTTERY
+            </h1>
+
+            <p className="text-[#c6d6cc] text-sm mt-2">
+              Choose your ticket and join the next exciting draw.
+            </p>
+
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d6a94d]/40 bg-black/20 px-4 py-2">
+              <span className="w-2 h-2 rounded-full bg-[#d6a94d] animate-pulse" />
+              <span className="text-[#f2d28c] text-xs font-bold">
+                TODAY'S JACKPOT
+              </span>
+            </div>
+
+            <div className="mt-4 text-3xl sm:text-4xl font-black text-[#f2d28c] tabular-nums">
+              ৳{formatMoney(jackpotAmounts[activeJackpot])}
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 max-w-xs mx-auto">
+              {[
+                ["HOURS", timeLeft.hours],
+                ["MINS", timeLeft.minutes],
+                ["SECS", timeLeft.seconds],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-lg bg-black/35 border border-white/10 py-2 text-center"
+                >
+                  <div className="text-xl font-black tabular-nums">
+                    {value}
                   </div>
-
-                  <div className="jackpot-amount">
-                    ৳ {amount.toLocaleString()}
-                  </div>
-
-                  <div className="timer-container">
-                    <div className="timer-box">
-                      <span>{timeLeft.hours}</span>
-                      <span>HOURS</span>
-                    </div>
-
-                    <div className="timer-box">
-                      <span>{timeLeft.minutes}</span>
-                      <span>MINS</span>
-                    </div>
-
-                    <div className="timer-box">
-                      <span>{timeLeft.seconds}</span>
-                      <span>SECS</span>
-                    </div>
+                  <div className="text-[9px] text-gray-400 font-bold">
+                    {label}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="jackpot-dots">
+            <div className="flex items-center justify-center gap-2 mt-4">
               {jackpotAmounts.map((_, index) => (
-                <div
+                <button
                   key={index}
-                  className={`jackpot-dot ${
-                    activeJackpot === index ? "active" : ""
-                  }`}
+                  type="button"
+                  aria-label={`Show jackpot slide ${index + 1}`}
                   onClick={() => setActiveJackpot(index)}
+                  className={`h-2 rounded-full transition-all ${
+                    activeJackpot === index
+                      ? "w-6 bg-[#e9c477]"
+                      : "w-2 bg-white/40"
+                  }`}
                 />
               ))}
             </div>
           </div>
+        </section>
 
-          {/* Dynamic Lottery Draw Cards */}
-          <div className="mt-4">
-            <div className="ticket-list-container">
+        {/* Lottery Heading */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-extrabold">
+              Available Lottery Draws
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">
+              Select a draw to view details or buy tickets
+            </p>
+          </div>
 
-              {drawError && (
-                <div className="lotto-card">
-                  <p className="text-white text-center p-4">
-                    {drawError}
-                  </p>
-                </div>
-              )}
+          <span className="text-[#e9c477] text-xs font-bold">
+            DAILY
+          </span>
+        </div>
 
-              {!drawError && draws.length === 0 && (
-                <div className="lotto-card">
-                  <p className="text-white text-center p-4">
-                    No lottery draws are currently available.
-                  </p>
-                </div>
-              )}
+        {/* Existing Lottery Error Message */}
+        {drawError && (
+          <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-4 mb-4">
+            <p className="text-red-300 text-sm text-center">
+              {drawError}
+            </p>
+          </div>
+        )}
 
-              {draws.map((draw) => {
-                const tier = getDrawTitle(
-                  Number(draw.ticket_price)
-                );
+        {/* Existing Lottery Draw Cards - Jackpot visual style */}
+        <div className="grid grid-cols-1 gap-4">
+          {!drawError && draws.length === 0 && (
+            <section className="rounded-2xl border border-[#b58b43]/30 bg-[#10231b] p-5 text-center shadow-lg">
+              <p className="text-gray-300 text-sm">
+                No lottery draws are currently available.
+              </p>
+            </section>
+          )}
 
-                const prize =
-                  Number(draw.prize_amount) ||
-                  Number(draw.total_jackpot) ||
-                  0;
+          {draws.map((draw) => {
+            const tier = getDrawTitle(Number(draw.ticket_price));
 
-                const isOpen = draw.status === "open";
+            const prize =
+              Number(draw.prize_amount) ||
+              Number(draw.total_jackpot) ||
+              0;
 
-                return (
-                  <div key={draw.id} className="lotto-card">
+            const isOpen = draw.status === "open";
 
-                    {/* Card Header */}
-                    <div className="lotto-card-header">
-                      <div
-                        className={`lotto-card-title ${tier.color}`}
-                      >
+            return (
+              <section
+                key={draw.id}
+                className="relative overflow-hidden rounded-2xl border border-[#b58b43]/35 bg-[#10231b] shadow-lg"
+              >
+                <div className="absolute -right-10 -top-12 w-40 h-40 rounded-full bg-[#d6a94d]/10 blur-3xl" />
+
+                <div className="relative z-10 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-extrabold tracking-[2px] text-[#e9c477]">
+                        LOTTERY CATEGORY
+                      </div>
+
+                      <h3 className="text-2xl font-black mt-1">
                         {tier.title}{" "}
                         <span
-                          style={{
-                            color:
-                              tier.color === "orange"
-                                ? "#16a34a"
-                                : "#f97316",
-                          }}
+                          className={
+                            tier.color === "orange"
+                              ? "text-[#e5a83b]"
+                              : "text-[#7dd3a7]"
+                          }
                         >
                           {tier.titleSpan}
                         </span>
-                      </div>
+                      </h3>
 
-                      <div className="lotto-card-date">
-                        <span>
-                          {formatDrawDate(draw.draw_date)}
-                        </span>
-
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect
-                            x="3"
-                            y="4"
-                            width="18"
-                            height="18"
-                            rx="2"
-                            ry="2"
-                          />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Draw Date: {formatDrawDate(draw.draw_date)}
+                      </p>
                     </div>
 
-                    {/* Draw Information */}
-                    <div className="px-3 py-2 text-white text-sm">
-                      <div className="flex justify-between mb-2">
-                        <span>Prize Amount</span>
-                        <strong>
-                          ৳ {prize.toLocaleString()}
-                        </strong>
-                      </div>
-
-                      <div className="flex justify-between mb-2">
-                        <span>Ticket Price</span>
-                        <strong>
-                          ৳ {Number(draw.ticket_price).toLocaleString()}
-                        </strong>
-                      </div>
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-[#d6a94d] text-xl font-black text-[#f2d28c] bg-[#d6a94d]/10">
+                      ৳
                     </div>
-
-                    {/* Card Actions */}
-                    <div className="lotto-card-actions">
-                      <button
-                        className="lotto-btn secondary"
-                        onClick={() =>
-                          router.push("/Winner-selection/")
-                        }
-                      >
-                        Draw History
-                      </button>
-
-                      <button
-                        className="lotto-btn primary"
-                        disabled={!isOpen}
-                        style={
-                          !isOpen
-                            ? {
-                                opacity: 0.55,
-                                cursor: "not-allowed",
-                              }
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!isOpen) return;
-
-                          if (!isAuthenticated) {
-                            router.push("/Client/Login/");
-                            return;
-                          }
-
-                          router.push(
-                            `/Client/Ticket-Buy?draw_id=${encodeURIComponent(
-                              draw.id
-                            )}`
-                          );
-                        }}
-                      >
-                        {isOpen
-                          ? `Buy ৳${Number(draw.ticket_price).toLocaleString()}`
-                          : "Coming Soon"}
-                      </button>
-                    </div>
-
-                    {/* Next Draw Timer */}
-                    <div className="lotto-timer-bar">
-                      <div className="lotto-timer-label">
-                        Next
-                        <br />
-                        Draw
-                      </div>
-
-                      <div className="lotto-timer-boxes">
-                        <div className="lotto-t-box">
-                          <span className="t-val">
-                            {timeLeft.days}
-                          </span>
-                          <span className="t-lbl">Days</span>
-                        </div>
-
-                        <div className="lotto-t-box">
-                          <span className="t-val">
-                            {timeLeft.hours}
-                          </span>
-                          <span className="t-lbl">Hours</span>
-                        </div>
-
-                        <div className="lotto-t-box">
-                          <span className="t-val">
-                            {timeLeft.minutes}
-                          </span>
-                          <span className="t-lbl">Mins</span>
-                        </div>
-
-                        <div className="lotto-t-box">
-                          <span className="t-val">
-                            {timeLeft.seconds}
-                          </span>
-                          <span className="t-lbl">Secs</span>
-                        </div>
-                      </div>
-                    </div>
-
                   </div>
-                );
-              })}
 
-            </div>
-          </div>
+                  <div className="mt-4 rounded-xl bg-black/25 p-4">
+                    <p className="text-xs text-gray-400 font-semibold">
+                      TOTAL PRIZE
+                    </p>
 
-        </main>
-      </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-[#f2d28c]">
+                      ৳{formatMoney(prize)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="rounded-xl bg-black/25 p-3">
+                      <p className="text-[11px] text-gray-400">
+                        TICKET PRICE
+                      </p>
+                      <p className="text-sm font-bold mt-1">
+                        ৳{formatMoney(Number(draw.ticket_price))}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-black/25 p-3">
+                      <p className="text-[11px] text-gray-400">
+                        TICKETS SOLD
+                      </p>
+                      <p className="text-sm font-bold mt-1">
+                        {formatMoney(Number(draw.total_tickets_sold || 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 mt-4">
+                    <div>
+                      <p className="text-[11px] text-gray-400">
+                        DRAW STATUS
+                      </p>
+                      <p
+                        className={`text-xs font-bold mt-1 ${
+                          isOpen ? "text-green-400" : "text-yellow-300"
+                        }`}
+                      >
+                        {getStatus(draw.status)}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-[11px] text-gray-400">
+                        DRAW DATE
+                      </p>
+                      <p className="text-sm font-bold mt-1">
+                        {formatDrawDate(draw.draw_date)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="text-[11px] text-gray-400 mb-2">
+                      NEXT DRAW COUNTDOWN
+                    </p>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        ["DAYS", timeLeft.days],
+                        ["HOURS", timeLeft.hours],
+                        ["MINS", timeLeft.minutes],
+                        ["SECS", timeLeft.seconds],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-lg bg-black/35 border border-white/5 py-2 text-center"
+                        >
+                          <div className="text-lg font-black tabular-nums">
+                            {value}
+                          </div>
+                          <div className="text-[9px] text-gray-400 font-bold">
+                            {label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Existing Draw History navigation is preserved. */}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/Winner-selection/")}
+                    className="w-full mt-4 rounded-xl border border-[#d6a94d]/50 bg-black/20 py-3 text-[#f2d28c] font-extrabold text-sm transition active:scale-[0.98]"
+                  >
+                    DRAW HISTORY
+                  </button>
+
+                  {/* Existing Login and Ticket Purchase navigation is preserved. */}
+                  <button
+                    type="button"
+                    disabled={!isOpen}
+                    style={
+                      !isOpen
+                        ? {
+                            opacity: 0.55,
+                            cursor: "not-allowed",
+                          }
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (!isOpen) return;
+
+                      if (!isAuthenticated) {
+                        router.push("/Client/Login/");
+                        return;
+                      }
+
+                      router.push(
+                        `/Client/Ticket-Buy?draw_id=${encodeURIComponent(
+                          draw.id
+                        )}`
+                      );
+                    }}
+                    className="w-full mt-2 rounded-xl bg-[#d6a94d] text-[#071510] py-3 font-extrabold text-sm transition active:scale-[0.98]"
+                  >
+                    {isOpen
+                      ? `BUY TICKET ৳${formatMoney(Number(draw.ticket_price))}`
+                      : "COMING SOON"}
+                  </button>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        {/* Information section styled like Jackpot page */}
+        <section className="mt-6 rounded-xl border border-white/10 bg-[#10231b] p-4">
+          <h3 className="text-sm font-bold text-[#e9c477]">
+            HOW LOTTERY WORKS
+          </h3>
+
+          <ul className="mt-3 space-y-2 text-xs text-gray-300">
+            <li>• Choose one of the available Lottery draws.</li>
+            <li>• Check the draw date, ticket price and prize amount.</li>
+            <li>• Purchase tickets while sales are open.</li>
+            <li>• View previous results from Draw History.</li>
+          </ul>
+        </section>
+      </main>
 
       <LotteryFooter />
     </div>
