@@ -74,63 +74,63 @@ export default function LotteryHeader({
   const { siteName, logoUrl } = useSiteSettings();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const [isLoggedIn, setIsLoggedIn] = useState(
     initialAuthChecked ? initialIsLoggedIn : false
   );
+
   const [hasUnread, setHasUnread] = useState(false);
+
+  // =========================================
+  // Notification Check
+  // =========================================
 
   useEffect(() => {
     let isMounted = true;
+    let currentUserId: string | null = null;
 
     const fetchNotifications = async (userId: string) => {
-      const { data, error } = await supabase
-        .from("user_notifications")
-        .select("id, user_id")
-        .or(`user_id.eq.${userId},user_id.is.null`)
-        .eq("is_read", false);
+      const [
+        { data: notifications, error: notificationError },
+        { data: reads, error: readError },
+      ] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("id"),
+
+        supabase
+          .from("notification_reads")
+          .select("notification_id")
+          .eq("user_id", userId),
+      ]);
 
       if (!isMounted) return;
 
-      if (!error && data) {
-        const readBroadcasts = JSON.parse(
-          localStorage.getItem("read_broadcast_notifs") || "[]"
-        );
-
-        const actualUnread = data.filter((notif) => {
-          if (notif.user_id === null) {
-            return !readBroadcasts.includes(notif.id);
-          }
-          return true;
-        });
-
-        setHasUnread(actualUnread.length > 0);
-      }
-    };
-
-    const checkUserAndNotifications = async () => {
-      if (initialAuthChecked) {
-        setIsLoggedIn(initialIsLoggedIn);
-
-        if (initialIsLoggedIn) {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          if (isMounted && session?.user) {
-            await fetchNotifications(session.user.id);
-          }
-        } else {
-          setHasUnread(false);
-        }
-
+      if (notificationError || readError) {
         return;
       }
 
+      const readIds = new Set(
+        (reads || []).map((item) => item.notification_id)
+      );
+
+      const unreadExists = (notifications || []).some(
+        (notification) => !readIds.has(notification.id)
+      );
+
+      setHasUnread(unreadExists);
+    };
+
+    const updateAuth = async () => {
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!isMounted) return;
+
+      const user = session?.user;
+
+      currentUserId = user?.id || null;
 
       setIsLoggedIn(!!user);
 
@@ -141,10 +141,38 @@ export default function LotteryHeader({
       }
     };
 
-    checkUserAndNotifications();
+    updateAuth();
+
+    // Auth State Listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+
+      const user = session?.user;
+
+      currentUserId = user?.id || null;
+
+      setIsLoggedIn(!!user);
+
+      if (user) {
+        fetchNotifications(user.id);
+      } else {
+        setHasUnread(false);
+      }
+    });
+
+    // Automatically check every 10 seconds
+    const notificationInterval = setInterval(() => {
+      if (currentUserId) {
+        fetchNotifications(currentUserId);
+      }
+    }, 10000);
 
     return () => {
       isMounted = false;
+      subscription.unsubscribe();
+      clearInterval(notificationInterval);
     };
   }, [
     userProfile,
@@ -155,6 +183,7 @@ export default function LotteryHeader({
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
+    setHasUnread(false);
     setIsMenuOpen(false);
     router.push("/Client/Login/");
   };
@@ -186,6 +215,7 @@ export default function LotteryHeader({
               className="relative p-1.5 rounded-full bg-black/20 hover:bg-black/40 transition border border-white/10"
             >
               <Icons.Bell />
+
               {hasUnread && (
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
               )}
