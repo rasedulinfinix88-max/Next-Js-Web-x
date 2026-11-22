@@ -23,8 +23,7 @@ function response(data: unknown, status = 200) {
 
 function isUUID(value: unknown): value is string {
   return typeof value === "string" &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      .test(value);
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function isValidDate(value: unknown): value is string {
@@ -80,15 +79,19 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = body?.action;
 
-    // =================================================
-    // USER ACTION 1: PURCHASE TICKET
-    // =================================================
+    // Support both frontend parameter naming styles.
+    const drawId = body?.p_draw_id ?? body?.draw_id;
+    const category = body?.p_category ?? body?.category;
+    const salesOpenAt = body?.p_sales_open_at ?? body?.sales_open_at;
+    const salesCloseAt = body?.p_sales_close_at ?? body?.sales_close_at;
+    const drawAt = body?.p_draw_at ?? body?.draw_at;
 
+    // USER: PURCHASE TICKET
     if (action === "purchase_ticket") {
-      const drawId = body?.draw_id;
+      const purchaseDrawId = body?.draw_id;
       const requestId = body?.request_id;
 
-      if (!isUUID(drawId) || !isUUID(requestId)) {
+      if (!isUUID(purchaseDrawId) || !isUUID(requestId)) {
         return response(
           { success: false, message: "Invalid draw ID or request ID" },
           400,
@@ -98,47 +101,32 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabase.rpc(
         "jackpot_purchase_ticket",
         {
-          p_draw_id: drawId,
+          p_draw_id: purchaseDrawId,
           p_request_id: requestId,
         },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // USER ACTION 2: AVAILABLE DRAWS
-    // =================================================
-
+    // USER: AVAILABLE DRAWS
     if (action === "available_draws") {
       const { data, error } = await supabase.rpc(
         "jackpot_get_available_draws",
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
-      return response({
-        success: true,
-        draws: data ?? [],
-      });
+      return response({ success: true, draws: data ?? [] });
     }
 
-    // =================================================
-    // USER ACTION 3: MY TICKETS
-    // =================================================
-
+    // USER: MY TICKETS
     if (action === "my_tickets") {
       const limit = Number(body?.limit ?? 50);
       const offset = Number(body?.offset ?? 0);
@@ -164,25 +152,14 @@ Deno.serve(async (req: Request) => {
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
-      return response({
-        success: true,
-        tickets: data ?? [],
-      });
+      return response({ success: true, tickets: data ?? [] });
     }
 
-    // =================================================
-    // ADMIN ACTION 1: CREATE DRAW
-    // =================================================
-
+    // ADMIN: CREATE DRAW
     if (action === "admin_create_draw") {
-      const category = body?.category;
-
       if (!["500", "1000", "2000"].includes(category)) {
         return response(
           { success: false, message: "Invalid Jackpot category" },
@@ -191,9 +168,9 @@ Deno.serve(async (req: Request) => {
       }
 
       if (
-        !isValidDate(body?.sales_open_at) ||
-        !isValidDate(body?.sales_close_at) ||
-        !isValidDate(body?.draw_at)
+        !isValidDate(salesOpenAt) ||
+        !isValidDate(salesCloseAt) ||
+        !isValidDate(drawAt)
       ) {
         return response(
           { success: false, message: "Invalid schedule dates" },
@@ -205,50 +182,35 @@ Deno.serve(async (req: Request) => {
         "jackpot_admin_create_draw",
         {
           p_category: category,
-          p_sales_open_at: body.sales_open_at,
-          p_sales_close_at: body.sales_close_at,
-          p_draw_at: body.draw_at,
+          p_sales_open_at: salesOpenAt,
+          p_sales_close_at: salesCloseAt,
+          p_draw_at: drawAt,
         },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // ADMIN ACTION 2: LIST DRAWS
-    // =================================================
-
+    // ADMIN: LIST DRAWS
     if (action === "admin_list_draws") {
       const { data, error } = await supabase.rpc(
         "jackpot_admin_list_draws",
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
-      return response({
-        success: true,
-        draws: data ?? [],
-      });
+      return response({ success: true, draws: data ?? [] });
     }
 
-    // =================================================
-    // ADMIN ACTION 3: UPDATE DRAW SCHEDULE
-    // =================================================
-
+    // ADMIN: UPDATE DRAW
     if (action === "admin_update_draw") {
-      if (!isUUID(body?.draw_id)) {
+      if (!isUUID(drawId)) {
         return response(
           { success: false, message: "Invalid draw ID" },
           400,
@@ -256,9 +218,9 @@ Deno.serve(async (req: Request) => {
       }
 
       if (
-        !isValidDate(body?.sales_open_at) ||
-        !isValidDate(body?.sales_close_at) ||
-        !isValidDate(body?.draw_at)
+        !isValidDate(salesOpenAt) ||
+        !isValidDate(salesCloseAt) ||
+        !isValidDate(drawAt)
       ) {
         return response(
           { success: false, message: "Invalid schedule dates" },
@@ -269,29 +231,23 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabase.rpc(
         "jackpot_admin_update_draw",
         {
-          p_draw_id: body.draw_id,
-          p_sales_open_at: body.sales_open_at,
-          p_sales_close_at: body.sales_close_at,
-          p_draw_at: body.draw_at,
+          p_draw_id: drawId,
+          p_sales_open_at: salesOpenAt,
+          p_sales_close_at: salesCloseAt,
+          p_draw_at: drawAt,
         },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // ADMIN ACTION 4: OPEN DRAW
-    // =================================================
-
+    // ADMIN: OPEN DRAW
     if (action === "admin_open_draw") {
-      if (!isUUID(body?.draw_id)) {
+      if (!isUUID(drawId)) {
         return response(
           { success: false, message: "Invalid draw ID" },
           400,
@@ -300,27 +256,19 @@ Deno.serve(async (req: Request) => {
 
       const { data, error } = await supabase.rpc(
         "jackpot_admin_open_draw",
-        {
-          p_draw_id: body.draw_id,
-        },
+        { p_draw_id: drawId },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // ADMIN ACTION 5: CLOSE DRAW
-    // =================================================
-
+    // ADMIN: CLOSE DRAW
     if (action === "admin_close_draw") {
-      if (!isUUID(body?.draw_id)) {
+      if (!isUUID(drawId)) {
         return response(
           { success: false, message: "Invalid draw ID" },
           400,
@@ -329,27 +277,19 @@ Deno.serve(async (req: Request) => {
 
       const { data, error } = await supabase.rpc(
         "jackpot_admin_close_draw",
-        {
-          p_draw_id: body.draw_id,
-        },
+        { p_draw_id: drawId },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // ADMIN ACTION 6: RANDOM WINNER SELECTION
-    // =================================================
-
+    // ADMIN: RANDOM WINNER SELECTION
     if (action === "admin_select_random_winner") {
-      if (!isUUID(body?.draw_id)) {
+      if (!isUUID(drawId)) {
         return response(
           { success: false, message: "Invalid draw ID" },
           400,
@@ -358,27 +298,19 @@ Deno.serve(async (req: Request) => {
 
       const { data, error } = await supabase.rpc(
         "jackpot_v2_admin_select_random_winner",
-        {
-          p_draw_id: body.draw_id,
-        },
+        { p_draw_id: drawId },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
 
-    // =================================================
-    // ADMIN ACTION 7: PUBLISH WINNER RESULT
-    // =================================================
-
+    // ADMIN: PUBLISH RESULT
     if (action === "admin_publish_result") {
-      if (!isUUID(body?.draw_id)) {
+      if (!isUUID(drawId)) {
         return response(
           { success: false, message: "Invalid draw ID" },
           400,
@@ -387,24 +319,15 @@ Deno.serve(async (req: Request) => {
 
       const { data, error } = await supabase.rpc(
         "jackpot_v2_admin_publish_result",
-        {
-          p_draw_id: body.draw_id,
-        },
+        { p_draw_id: drawId },
       );
 
       if (error) {
-        return response(
-          { success: false, message: error.message },
-          400,
-        );
+        return response({ success: false, message: error.message }, 400);
       }
 
       return response(data);
     }
-
-    // =================================================
-    // UNKNOWN ACTION
-    // =================================================
 
     return response(
       { success: false, message: "Unknown Jackpot action" },
@@ -415,7 +338,12 @@ Deno.serve(async (req: Request) => {
     console.error("Jackpot Manager Error:", error);
 
     return response(
-      { success: false, message: "An unexpected server error occurred" },
+      {
+        success: false,
+        message: error instanceof Error
+          ? error.message
+          : "An unexpected server error occurred",
+      },
       500,
     );
   }
