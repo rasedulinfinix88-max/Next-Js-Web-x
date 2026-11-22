@@ -11,6 +11,7 @@ type Notification = {
   message: string;
   notification_type: string;
   created_at: string;
+  is_hidden: boolean;
 };
 
 export default function NotificationPage() {
@@ -20,6 +21,7 @@ export default function NotificationPage() {
   const [userId, setUserId] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [readingId, setReadingId] = useState("");
   const [error, setError] = useState("");
 
@@ -51,7 +53,10 @@ export default function NotificationPage() {
     const { data: notificationData, error: notificationError } =
       await supabase
         .from("notifications")
-        .select("id, title, message, notification_type, created_at")
+        .select(
+          "id, title, message, notification_type, created_at, is_hidden"
+        )
+        .eq("is_hidden", false)
         .order("created_at", { ascending: false });
 
     if (notificationError) {
@@ -81,9 +86,16 @@ export default function NotificationPage() {
     loadNotifications();
   }, [loadNotifications]);
 
+  const toggleMessage = (notificationId: string) => {
+    setExpandedIds((previous) =>
+      previous.includes(notificationId)
+        ? previous.filter((id) => id !== notificationId)
+        : [...previous, notificationId]
+    );
+  };
+
   const markAsRead = async (notificationId: string) => {
     if (!userId || readingId) return;
-
     if (readIds.includes(notificationId)) return;
 
     setReadingId(notificationId);
@@ -108,10 +120,6 @@ export default function NotificationPage() {
 
     setReadingId("");
   };
-
-  const unreadCount = notifications.filter(
-    (item) => !readIds.includes(item.id)
-  ).length;
 
   if (loading) {
     return (
@@ -150,28 +158,6 @@ export default function NotificationPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-5">
-        <section className="mb-5 rounded-xl border border-[#24543b] bg-[#10251a] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-white">
-                Your Notifications
-              </h2>
-              <p className="mt-1 text-xs text-gray-400">
-                {notifications.length} Total Notifications
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-[#07110d] px-3 py-2 text-center">
-              <p className="text-lg font-bold text-green-400">
-                {unreadCount}
-              </p>
-              <p className="text-[10px] text-gray-400">
-                Unread
-              </p>
-            </div>
-          </div>
-        </section>
-
         {error && (
           <div className="mb-4 rounded-lg border border-red-700 bg-red-950/40 p-3 text-xs text-red-300">
             {error}
@@ -193,6 +179,15 @@ export default function NotificationPage() {
             {notifications.map((item) => {
               const isRead = readIds.includes(item.id);
               const isReading = readingId === item.id;
+              const isExpanded = expandedIds.includes(item.id);
+
+              const words = item.message.trim().split(/\s+/).filter(Boolean);
+              const hasMore = words.length > 5;
+
+              const displayedMessage =
+                isExpanded || !hasMore
+                  ? item.message
+                  : words.slice(0, 5).join(" ") + "...";
 
               return (
                 <article
@@ -222,8 +217,18 @@ export default function NotificationPage() {
                   </div>
 
                   <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-gray-300">
-                    {item.message}
+                    {displayedMessage}
                   </p>
+
+                  {hasMore && (
+                    <button
+                      type="button"
+                      onClick={() => toggleMessage(item.id)}
+                      className="mt-2 text-xs font-bold text-green-400 hover:text-green-300"
+                    >
+                      {isExpanded ? "Less more" : "Read more"}
+                    </button>
+                  )}
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#24543b] pt-3">
                     <p className="text-[10px] text-gray-500">
