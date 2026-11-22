@@ -359,13 +359,20 @@ function JackpotTicketBuyContent() {
           );
         }
 
-        const verificationUrl =
-          `${window.location.origin}/verify-ticket?token=` +
-          encodeURIComponent(qrResponse.token);
+        // GitHub Pages Base Path
+        const verificationUrl = new URL(
+          "/Next-Js-Web-x/verify-ticket/",
+          window.location.origin
+        );
+
+        verificationUrl.searchParams.set(
+          "token",
+          qrResponse.token
+        );
 
         const imageUrl =
           "https://api.qrserver.com/v1/create-qr-code/" +
-          `?size=300x300&data=${encodeURIComponent(verificationUrl)}`;
+          `?size=300x300&data=${encodeURIComponent(verificationUrl.toString())}`;
 
         setQrUrl(imageUrl);
       } catch (qrErr: any) {
