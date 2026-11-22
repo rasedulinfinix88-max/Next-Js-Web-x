@@ -7,7 +7,6 @@ import { supabase } from "../../../lib/supabase/client";
 import LotteryHeader from "../../../components/Header/Header";
 import LotteryFooter from "../../../components/Footer/Footer";
 
-
 type JackpotDraw = {
   id: string;
   category: number;
@@ -170,6 +169,14 @@ export default function JackpotHomePage() {
     if (draw.status === "cancelled") return "Cancelled";
 
     return draw.status;
+  };
+
+  const handleBuyTicket = (draw: JackpotDraw) => {
+    if (!draw?.id || draw.status !== "open") return;
+
+    router.push(
+      `/Client/Jackpot/Ticket-Buy/?draw_id=${encodeURIComponent(draw.id)}`
+    );
   };
 
   if (loading) {
@@ -371,6 +378,18 @@ export default function JackpotHomePage() {
                     }}
                   >
                     VIEW JACKPOT DETAILS
+                  </button>
+
+                  <button
+                    onClick={() => draw && handleBuyTicket(draw)}
+                    disabled={!draw || !isOpen}
+                    className={`w-full mt-2 rounded-xl py-3 font-extrabold text-sm transition ${
+                      draw && isOpen
+                        ? "bg-[#e9c477] text-[#071510] active:scale-[0.98]"
+                        : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {isOpen ? "BUY TICKET NOW" : "TICKET SALES NOT OPEN"}
                   </button>
                 </div>
               </section>
