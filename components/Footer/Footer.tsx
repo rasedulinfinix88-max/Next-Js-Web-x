@@ -47,9 +47,9 @@ export default function LotteryFooter() {
       </Link>
 
       {/* 3. Jackpot */}
-      <Link href="/Lottery/tickets-buy-activity" className="flex flex-col items-center cursor-pointer transition-colors text-white">
+      <Link href="/Client/Jackpot" className="flex flex-col items-center cursor-pointer transition-colors text-white">
         <div className={`p-1.5 rounded-xl transition-all duration-300 ${
-          isActive("/Lottery/tickets-buy-activity")
+          isActive("/Client/Jackpot")
             ? "bg-[#183f35] scale-110"
             : "hover:bg-[#218653]"
         }`}>
