@@ -7,17 +7,55 @@ import { createClient } from "../../../lib/supabase/client";
 import { checkAdminAccess } from "../../../lib/admin/admin-auth";
 import AdminMenu from "../../../components/admin/AdminMenu";
 
+type Draw = {
+  id: string;
+  category: string;
+  ticket_price: number;
+  prize_amount: number;
+  sales_open_at: string;
+  sales_close_at: string;
+  draw_at: string;
+  status: string;
+  total_tickets_sold: number;
+  created_at: string;
+};
+
+function toLocalDateTime(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+function formatPrize(value: number) {
+  return Number(value).toLocaleString("en-BD");
+}
+
 export default function JackpotManagementPage() {
   const router = useRouter();
 
   const [checking, setChecking] = useState(true);
   const [adminAllowed, setAdminAllowed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testingWinner, setTestingWinner] = useState(false);
-  const [testingPublish, setTestingPublish] = useState(false);
-  const [response, setResponse] = useState("");
+  const [draws, setDraws] = useState<Draw[]>([]);
+  const [loadingDraws, setLoadingDraws] = useState(false);
+  const [busyAction, setBusyAction] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const [category, setCategory] = useState("500");
+  const [salesOpenAt, setSalesOpenAt] = useState("");
+  const [salesCloseAt, setSalesCloseAt] = useState("");
+  const [drawAt, setDrawAt] = useState("");
+  const [editingDrawId, setEditingDrawId] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -60,9 +98,9 @@ export default function JackpotManagementPage() {
     }
   }
 
-  async function runApiTest(
+  async function callApi(
     action: string,
-    body: Record<string, string>
+    params: Record<string, string> = {}
   ) {
     const supabase = createClient();
 
@@ -71,7 +109,7 @@ export default function JackpotManagementPage() {
 
     if (!sessionData.session?.access_token) {
       throw new Error(
-        "Login session পাওয়া যায়নি। আবার Admin Login করুন।"
+        "Admin Login session পাওয়া যায়নি। আবার Login করুন।"
       );
     }
 
@@ -81,7 +119,7 @@ export default function JackpotManagementPage() {
         {
           body: {
             action,
-            ...body
+            ...params
           }
         }
       );
@@ -94,86 +132,163 @@ export default function JackpotManagementPage() {
       ).context;
 
       if (context instanceof Response) {
-        const responseBody = await context.clone().text();
+        const body = await context.clone().text();
 
         details =
-          `HTTP Status: ${context.status}\n` +
-          `Status Text: ${context.statusText}\n\n` +
-          `Backend Response:\n${responseBody || functionError.message}`;
+          `HTTP Status: ${context.status}\n\n` +
+          `Backend Response:\n${body || functionError.message}`;
       }
 
       throw new Error(details);
     }
 
-    setResponse(JSON.stringify(data, null, 2));
+    if (data?.success === false) {
+      throw new Error(
+        data.message || "Backend operation ব্যর্থ হয়েছে।"
+      );
+    }
+
+    return data;
   }
 
-  async function testDrawList() {
-    setTesting(true);
+  async function loadDraws() {
+    setLoadingDraws(true);
     setError("");
-    setResponse("");
 
     try {
-      await runApiTest("admin_list_draws", {});
+      const data = await callApi("admin_list_draws");
+      setDraws(Array.isArray(data?.draws) ? data.draws : []);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "API পরীক্ষা ব্যর্থ হয়েছে।"
+          : "Draw List পাওয়া যায়নি।"
       );
     } finally {
-      setTesting(false);
+      setLoadingDraws(false);
     }
   }
 
-  async function testRandomWinner() {
-    setTestingWinner(true);
+  useEffect(() => {
+    if (adminAllowed) {
+      loadDraws();
+    }
+  }, [adminAllowed]);
+
+  function validateSchedule() {
+    if (!salesOpenAt || !salesCloseAt || !drawAt) {
+      throw new Error("তিনটি তারিখ ও সময় পূরণ করুন।");
+    }
+
+    const open = new Date(salesOpenAt).getTime();
+    const close = new Date(salesCloseAt).getTime();
+    const draw = new Date(drawAt).getTime();
+
+    if (
+      !Number.isFinite(open) ||
+      !Number.isFinite(close) ||
+      !Number.isFinite(draw) ||
+      open >= close ||
+      close > draw
+    ) {
+      throw new Error(
+        "সময় সঠিক নয়। Sales Start < Sales End এবং Sales End ≤ Draw Time হতে হবে।"
+      );
+    }
+  }
+
+  async function saveDraw() {
+    setBusyAction("save");
     setError("");
-    setResponse("");
+    setNotice("");
 
     try {
-      await runApiTest(
-        "admin_select_random_winner",
-        {
-          p_draw_id: "00000000-0000-4000-8000-000000000000"
-        }
-      );
+      validateSchedule();
+
+      const params = {
+        p_sales_open_at: new Date(salesOpenAt).toISOString(),
+        p_sales_close_at: new Date(salesCloseAt).toISOString(),
+        p_draw_at: new Date(drawAt).toISOString()
+      };
+
+      if (editingDrawId) {
+        await callApi("admin_update_draw", {
+          p_draw_id: editingDrawId,
+          ...params
+        });
+
+        setNotice("Draw Schedule সফলভাবে Update হয়েছে।");
+      } else {
+        await callApi("admin_create_draw", {
+          p_category: category,
+          ...params
+        });
+
+        setNotice("নতুন Jackpot Draw তৈরি হয়েছে।");
+      }
+
+      setEditingDrawId("");
+      await loadDraws();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Winner Selection API পরীক্ষা ব্যর্থ হয়েছে।"
+          : "Draw Save করা যায়নি।"
       );
     } finally {
-      setTestingWinner(false);
+      setBusyAction("");
     }
   }
 
-  async function testPublishResult() {
-    setTestingPublish(true);
+  function editSchedule(draw: Draw) {
+    setEditingDrawId(draw.id);
+    setCategory(String(draw.category));
+    setSalesOpenAt(toLocalDateTime(draw.sales_open_at));
+    setSalesCloseAt(toLocalDateTime(draw.sales_close_at));
+    setDrawAt(toLocalDateTime(draw.draw_at));
     setError("");
-    setResponse("");
+    setNotice("");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
+  }
+
+  function cancelEdit() {
+    setEditingDrawId("");
+    setSalesOpenAt("");
+    setSalesCloseAt("");
+    setDrawAt("");
+    setError("");
+  }
+
+  async function drawAction(
+    drawId: string,
+    action: string,
+    label: string
+  ) {
+    setBusyAction(drawId + action);
+    setError("");
+    setNotice("");
 
     try {
-      await runApiTest(
-        "admin_publish_result",
-        {
-          p_draw_id: "00000000-0000-4000-8000-000000000000"
-        }
-      );
+      await callApi(action, {
+        p_draw_id: drawId
+      });
+
+      setNotice(label + " সফল হয়েছে।");
+      await loadDraws();
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Publish Result API পরীক্ষা ব্যর্থ হয়েছে।"
+          : "Action সম্পন্ন হয়নি।"
       );
     } finally {
-      setTestingPublish(false);
+      setBusyAction("");
     }
   }
-
-  const anyTesting =
-    testing || testingWinner || testingPublish;
 
   if (checking || !adminAllowed) {
     return (
@@ -208,107 +323,282 @@ export default function JackpotManagementPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 py-8">
-        <div className="rounded-2xl border border-[#24543b] bg-[#10251a] p-5">
-          <div className="text-3xl">🎰</div>
-
-          <h2 className="mt-3 text-2xl font-bold text-green-400">
-            Jackpot Management
+      <section className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <div>
+          <h2 className="text-2xl font-bold text-green-400">
+            🎰 Jackpot Dashboard
           </h2>
-
           <p className="mt-2 text-sm text-gray-400">
-            Jackpot Backend API Testing
+            Manage Jackpot Draws, Sales Schedule and Results.
           </p>
+        </div>
 
-          <div className="mt-6 rounded-xl border border-[#24543b] bg-[#07110d] p-4">
-            <h3 className="font-semibold">
-              Draw List API Test
-            </h3>
-
-            <p className="mt-2 text-xs leading-6 text-gray-400">
-              Backend থেকে Jackpot Draw List পাওয়া যাচ্ছে কি না
-              যাচাই করা হবে। এতে কোনো Draw তৈরি বা পরিবর্তন হবে না।
+        {error && (
+          <div className="rounded-xl border border-red-800 bg-red-950/30 p-4">
+            <p className="font-semibold text-red-400">
+              Error
             </p>
-
-            <button
-              type="button"
-              onClick={testDrawList}
-              disabled={anyTesting}
-              className="mt-5 w-full rounded-lg bg-green-600 px-4 py-3 font-bold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {testing
-                ? "Testing API..."
-                : "Test Jackpot Draw List"}
-            </button>
+            <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-red-300">
+              {error}
+            </pre>
           </div>
+        )}
 
-          <div className="mt-5 rounded-xl border border-yellow-800 bg-[#07110d] p-4">
-            <h3 className="font-semibold text-yellow-400">
-              Random Winner Selection API Test
-            </h3>
-
-            <p className="mt-2 text-xs leading-6 text-gray-400">
-              কাল্পনিক Draw ID দিয়ে পরীক্ষা হবে।
-              কোনো আসল Winner নির্বাচন হবে না।
-            </p>
-
-            <button
-              type="button"
-              onClick={testRandomWinner}
-              disabled={anyTesting}
-              className="mt-5 w-full rounded-lg bg-yellow-600 px-4 py-3 font-bold text-black transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {testingWinner
-                ? "Testing Winner API..."
-                : "Test Random Winner Selection"}
-            </button>
+        {notice && (
+          <div className="rounded-xl border border-green-800 bg-green-950/20 p-4 text-sm text-green-300">
+            {notice}
           </div>
+        )}
 
-          <div className="mt-5 rounded-xl border border-blue-800 bg-[#07110d] p-4">
-            <h3 className="font-semibold text-blue-400">
-              Publish Result API Test
-            </h3>
+        <div className="rounded-2xl border border-[#24543b] bg-[#10251a] p-5">
+          <h3 className="text-lg font-bold text-green-400">
+            {editingDrawId ? "Update Draw Schedule" : "Create New Jackpot Draw"}
+          </h3>
 
-            <p className="mt-2 text-xs leading-6 text-gray-400">
-              কাল্পনিক Draw ID দিয়ে Result Publish API পরীক্ষা হবে।
-              কোনো আসল Result প্রকাশ বা পরিবর্তন হবে না।
-            </p>
+          {!editingDrawId && (
+            <div className="mt-5">
+              <label className="mb-2 block text-sm text-gray-300">
+                Ticket Category
+              </label>
 
-            <button
-              type="button"
-              onClick={testPublishResult}
-              disabled={anyTesting}
-              className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {testingPublish
-                ? "Testing Publish API..."
-                : "Test Publish Result"}
-            </button>
-          </div>
-
-          {error && (
-            <div className="mt-5 rounded-xl border border-red-800 bg-red-950/30 p-4">
-              <h3 className="font-semibold text-red-400">
-                API Error Details
-              </h3>
-
-              <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 text-xs leading-6 text-red-300">
-                {error}
-              </pre>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full rounded-lg border border-[#356348] bg-[#07110d] p-3 text-white"
+              >
+                <option value="500">
+                  ৳500 Ticket — ৳25,00,000 Prize
+                </option>
+                <option value="1000">
+                  ৳1,000 Ticket — ৳50,00,000 Prize
+                </option>
+                <option value="2000">
+                  ৳2,000 Ticket — ৳1,00,00,000 Prize
+                </option>
+              </select>
             </div>
           )}
 
-          {response && (
-            <div className="mt-5 rounded-xl border border-green-800 bg-green-950/20 p-4">
-              <h3 className="font-semibold text-green-400">
-                API Response
-              </h3>
-
-              <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 text-xs leading-6 text-gray-200">
-                {response}
-              </pre>
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="mb-2 block text-sm text-gray-300">
+                Sales Start Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={salesOpenAt}
+                onChange={(e) => setSalesOpenAt(e.target.value)}
+                className="w-full rounded-lg border border-[#356348] bg-[#07110d] p-3 text-white"
+              />
             </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-gray-300">
+                Sales End Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={salesCloseAt}
+                onChange={(e) => setSalesCloseAt(e.target.value)}
+                className="w-full rounded-lg border border-[#356348] bg-[#07110d] p-3 text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-gray-300">
+                Draw Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={drawAt}
+                onChange={(e) => setDrawAt(e.target.value)}
+                className="w-full rounded-lg border border-[#356348] bg-[#07110d] p-3 text-white"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={saveDraw}
+            disabled={!!busyAction}
+            className="mt-6 w-full rounded-lg bg-green-600 px-4 py-3 font-bold text-white disabled:opacity-50"
+          >
+            {busyAction === "save"
+              ? "Saving..."
+              : editingDrawId
+                ? "Update Draw Schedule"
+                : "Create Jackpot Draw"}
+          </button>
+
+          {editingDrawId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="mt-3 w-full rounded-lg border border-gray-600 px-4 py-3 font-semibold text-gray-300"
+            >
+              Cancel Editing
+            </button>
           )}
+        </div>
+
+        <div className="rounded-2xl border border-[#24543b] bg-[#10251a] p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-bold text-green-400">
+              Jackpot Draw List
+            </h3>
+
+            <button
+              type="button"
+              onClick={loadDraws}
+              disabled={loadingDraws || !!busyAction}
+              className="rounded-lg border border-green-700 px-3 py-2 text-sm text-green-300 disabled:opacity-50"
+            >
+              {loadingDraws ? "Loading..." : "Refresh"}
+            </button>
+          </div>
+
+          {loadingDraws && (
+            <p className="mt-5 text-sm text-gray-400">
+              Loading Jackpot Draws...
+            </p>
+          )}
+
+          {!loadingDraws && draws.length === 0 && (
+            <p className="mt-5 rounded-lg bg-[#07110d] p-4 text-sm text-gray-400">
+              এখনো কোনো Jackpot Draw তৈরি করা হয়নি।
+            </p>
+          )}
+
+          <div className="mt-5 space-y-4">
+            {draws.map((draw) => {
+              const busy = busyAction.startsWith(draw.id);
+
+              return (
+                <div
+                  key={draw.id}
+                  className="rounded-xl border border-[#356348] bg-[#07110d] p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-bold text-white">
+                      ৳{Number(draw.ticket_price).toLocaleString("en-BD")} Jackpot
+                    </h4>
+
+                    <span className="rounded-full bg-[#173b29] px-3 py-1 text-xs text-green-300">
+                      {draw.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 space-y-2 text-sm text-gray-300">
+                    <p>
+                      Prize: ৳{formatPrize(draw.prize_amount)}
+                    </p>
+                    <p>
+                      Tickets Sold: {formatPrize(draw.total_tickets_sold)}
+                    </p>
+                    <p>
+                      Sales Start: {formatDate(draw.sales_open_at)}
+                    </p>
+                    <p>
+                      Sales End: {formatDate(draw.sales_close_at)}
+                    </p>
+                    <p>
+                      Draw Time: {formatDate(draw.draw_at)}
+                    </p>
+                    <p className="break-all text-xs text-gray-500">
+                      Draw ID: {draw.id}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => editSchedule(draw)}
+                      disabled={busy || !!busyAction}
+                      className="rounded-lg border border-blue-700 px-3 py-3 text-xs font-semibold text-blue-300 disabled:opacity-50"
+                    >
+                      Edit Schedule
+                    </button>
+
+                    {draw.status === "upcoming" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          drawAction(
+                            draw.id,
+                            "admin_open_draw",
+                            "Sales Open"
+                          )
+                        }
+                        disabled={busy || !!busyAction}
+                        className="rounded-lg bg-green-700 px-3 py-3 text-xs font-bold disabled:opacity-50"
+                      >
+                        {busyAction === draw.id + "admin_open_draw"
+                          ? "Opening..."
+                          : "Open Sales"}
+                      </button>
+                    )}
+
+                    {draw.status === "open" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          drawAction(
+                            draw.id,
+                            "admin_close_draw",
+                            "Sales Close"
+                          )
+                        }
+                        disabled={busy || !!busyAction}
+                        className="rounded-lg bg-orange-700 px-3 py-3 text-xs font-bold disabled:opacity-50"
+                      >
+                        {busyAction === draw.id + "admin_close_draw"
+                          ? "Closing..."
+                          : "Close Sales"}
+                      </button>
+                    )}
+
+                    {draw.status === "closed" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          drawAction(
+                            draw.id,
+                            "admin_select_random_winner",
+                            "Random Winner Selection"
+                          )
+                        }
+                        disabled={busy || !!busyAction}
+                        className="rounded-lg bg-yellow-600 px-3 py-3 text-xs font-bold text-black disabled:opacity-50"
+                      >
+                        {busyAction === draw.id + "admin_select_random_winner"
+                          ? "Selecting..."
+                          : "Select Random Winner"}
+                      </button>
+                    )}
+
+                    {draw.status === "drawn" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          drawAction(
+                            draw.id,
+                            "admin_publish_result",
+                            "Publish Result"
+                          )
+                        }
+                        disabled={busy || !!busyAction}
+                        className="rounded-lg bg-blue-600 px-3 py-3 text-xs font-bold disabled:opacity-50"
+                      >
+                        {busyAction === draw.id + "admin_publish_result"
+                          ? "Publishing..."
+                          : "Publish Result"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
     </main>
