@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { supabase } from "../lib/supabase/client";
 import { useSiteSettings } from "../lib/SiteSettingsContext";
 
 const BASE_PATH = "/Next-Js-Web-x";
@@ -41,9 +40,6 @@ export default function MaintenanceGuard({
 
   const { maintenanceMode, isLoading } = useSiteSettings();
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
-
   const currentPath = normalizePath(pathname || "/");
 
   const isMaintenancePage =
@@ -59,85 +55,23 @@ export default function MaintenanceGuard({
     currentPath.startsWith(ADMIN_PATH + "/");
 
   useEffect(() => {
-    let active = true;
-
-    if (!maintenanceMode || !isAdminPage) {
-      setCheckingAdmin(false);
-      setIsAdmin(false);
-
-      return () => {
-        active = false;
-      };
-    }
-
-    setCheckingAdmin(true);
-    setIsAdmin(false);
-
-    async function verifyAdmin() {
-      try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
-
-        if (sessionError || !session?.user?.id) {
-          if (active) {
-            setIsAdmin(false);
-            setCheckingAdmin(false);
-          }
-          return;
-        }
-
-        const { data: profile, error: profileError } =
-          await supabase
-            .from("profiles")
-            .select("user_role, account_status")
-            .eq("id", session.user.id)
-            .maybeSingle();
-
-        if (!active) return;
-
-        const authorized =
-          !profileError &&
-          profile?.account_status === "active" &&
-          ["admin", "super_admin"].includes(profile?.user_role);
-
-        setIsAdmin(authorized);
-        setCheckingAdmin(false);
-      } catch {
-        if (active) {
-          setIsAdmin(false);
-          setCheckingAdmin(false);
-        }
-      }
-    }
-
-    verifyAdmin();
-
-    return () => {
-      active = false;
-    };
-  }, [maintenanceMode, isAdminPage]);
-
-  useEffect(() => {
     if (isLoading || !maintenanceMode) return;
 
+    // Admin Panel-কে Maintenance Redirect থেকে বাদ দেওয়া হচ্ছে।
+    if (isAdminPage) return;
+
+    // Maintenance ও Login Page সবসময় প্রবেশযোগ্য থাকবে।
     if (isMaintenancePage || isLoginPage) return;
 
-    if (isAdminPage && checkingAdmin) return;
-
-    if (isAdminPage && isAdmin) return;
-
-    // GitHub Pages-এর Project Base Path স্পষ্টভাবে যুক্ত করা হচ্ছে।
-    window.location.replace(`${BASE_PATH}/maintenance/`);
+    window.location.replace(
+      `${BASE_PATH}/maintenance/`
+    );
   }, [
     isLoading,
     maintenanceMode,
+    isAdminPage,
     isMaintenancePage,
     isLoginPage,
-    isAdminPage,
-    checkingAdmin,
-    isAdmin,
   ]);
 
   if (isLoading) {
@@ -152,19 +86,11 @@ export default function MaintenanceGuard({
     return <>{children}</>;
   }
 
-  if (isMaintenancePage || isLoginPage) {
+  if (isAdminPage) {
     return <>{children}</>;
   }
 
-  if (isAdminPage && checkingAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#07130e] text-white">
-        Verifying Admin...
-      </div>
-    );
-  }
-
-  if (isAdminPage && isAdmin) {
+  if (isMaintenancePage || isLoginPage) {
     return <>{children}</>;
   }
 
