@@ -73,10 +73,25 @@ async function decryptToken(token: string, serviceKey: string) {
     throw new Error("Invalid verification token.");
   }
 
-  return payload;
+  const ticketType =
+    payload.ticket_type === undefined
+      ? "lottery"
+      : payload.ticket_type;
+
+  if (
+    ticketType !== "lottery" &&
+    ticketType !== "jackpot"
+  ) {
+    throw new Error("Invalid ticket type.");
+  }
+
+  return {
+    ...payload,
+    ticket_type: ticketType,
+  };
 }
 
-async function getPublicTicket(admin: any, ticket: any) {
+async function getLotteryTicket(admin: any, ticket: any) {
   const { data: draw, error: drawError } = await admin
     .from("ticket_draws")
     .select("draw_date")
@@ -85,7 +100,7 @@ async function getPublicTicket(admin: any, ticket: any) {
 
   if (drawError) {
     console.error(
-      "Public draw database query failed:",
+      "Lottery draw database query failed:",
       drawError.code,
       drawError.message
     );
@@ -100,6 +115,65 @@ async function getPublicTicket(admin: any, ticket: any) {
     winner_status: ticket.is_winner === true
       ? "Winner"
       : "Not Winner",
+    ticket_type: "lottery",
+    prize_amount: Number(ticket.prize_amount ?? 0),
+  };
+}
+
+async function getJackpotTicket(admin: any, ticket: any) {
+  const { data: draw, error: drawError } = await admin
+    .from("jackpot_draws")
+    .select("draw_at")
+    .eq("id", ticket.draw_id)
+    .maybeSingle();
+
+  if (drawError) {
+    console.error(
+      "Jackpot draw database query failed:",
+      drawError.code,
+      drawError.message
+    );
+
+    throw new Error("Jackpot draw information is temporarily unavailable.");
+  }
+
+  const { data: result, error: resultError } = await admin
+    .from("jackpot_draw_results")
+    .select(
+      "winning_ticket_id, winning_ticket_number, prize_amount, result_status, published_at"
+    )
+    .eq("draw_id", ticket.draw_id)
+    .maybeSingle();
+
+  if (resultError) {
+    console.error(
+      "Jackpot result database query failed:",
+      resultError.code,
+      resultError.message
+    );
+
+    throw new Error("Jackpot result is temporarily unavailable.");
+  }
+
+  let winnerStatus = "Result Pending";
+  let prizeAmount = 0;
+
+  if (result?.published_at && result.result_status === "published") {
+    if (result.winning_ticket_id === ticket.id) {
+      winnerStatus = "Winner";
+      prizeAmount = Number(result.prize_amount ?? 0);
+    } else {
+      winnerStatus = "Not Winner";
+    }
+  }
+
+  return {
+    ticket_number: String(ticket.ticket_number ?? ""),
+    draw_date: String(draw?.draw_at ?? ""),
+    purchase_status: String(ticket.purchase_status ?? "Unknown"),
+    winner_status: winnerStatus,
+    ticket_type: "jackpot",
+    prize_amount: prizeAmount,
   };
 }
 
@@ -161,6 +235,7 @@ serve(async (req) => {
     );
 
     let ticket: any = null;
+    let ticketType: "lottery" | "jackpot" = "lottery";
 
     // Method 1: QR Token verification
     if (typeof body.token === "string" && body.token) {
@@ -184,10 +259,19 @@ serve(async (req) => {
         });
       }
 
+      ticketType = payload.ticket_type;
+
+      const table =
+        ticketType === "jackpot"
+          ? "jackpot_tickets"
+          : "ticket_purchases";
+
       const { data, error } = await admin
-        .from("ticket_purchases")
+        .from(table)
         .select(
-          "id, draw_id, ticket_number, purchase_status, is_winner"
+          ticketType === "jackpot"
+            ? "id, draw_id, ticket_number, purchase_status"
+            : "id, draw_id, ticket_number, purchase_status, is_winner, prize_amount"
         )
         .eq("id", payload.ticket_id)
         .maybeSingle();
@@ -215,6 +299,23 @@ serve(async (req) => {
     // Method 2: Manual Ticket Number verification
     else if (typeof body.ticket_number === "string") {
       const manualNumber = body.ticket_number.trim();
+      const requestedType =
+        body.ticket_type === undefined
+          ? "lottery"
+          : body.ticket_type;
+
+      if (
+        requestedType !== "lottery" &&
+        requestedType !== "jackpot"
+      ) {
+        return jsonResponse({
+          success: false,
+          valid: false,
+          message: "Invalid ticket type.",
+        }, 400);
+      }
+
+      ticketType = requestedType;
 
       if (!manualNumber || manualNumber.length > 100) {
         return jsonResponse({
@@ -224,10 +325,17 @@ serve(async (req) => {
         });
       }
 
+      const table =
+        ticketType === "jackpot"
+          ? "jackpot_tickets"
+          : "ticket_purchases";
+
       const { data, error } = await admin
-        .from("ticket_purchases")
+        .from(table)
         .select(
-          "id, draw_id, ticket_number, purchase_status, is_winner"
+          ticketType === "jackpot"
+            ? "id, draw_id, ticket_number, purchase_status"
+            : "id, draw_id, ticket_number, purchase_status, is_winner, prize_amount"
         )
         .eq("ticket_number", manualNumber)
         .maybeSingle();
@@ -269,7 +377,10 @@ serve(async (req) => {
       });
     }
 
-    const publicTicket = await getPublicTicket(admin, ticket);
+    const publicTicket =
+      ticketType === "jackpot"
+        ? await getJackpotTicket(admin, ticket)
+        : await getLotteryTicket(admin, ticket);
 
     return jsonResponse({
       success: true,
