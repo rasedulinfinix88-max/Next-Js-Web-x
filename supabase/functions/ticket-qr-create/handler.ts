@@ -98,10 +98,26 @@ serve(async (req) => {
     const body = await req.json();
     const ticket_id = body?.ticket_id;
 
+    // Existing requests without ticket_type remain Lottery requests.
+    const ticket_type =
+      body?.ticket_type === undefined
+        ? "lottery"
+        : body.ticket_type;
+
     if (typeof ticket_id !== "string" || !ticket_id.trim()) {
       return json({
         success: false,
         message: "Invalid ticket ID",
+      }, 400);
+    }
+
+    if (
+      ticket_type !== "lottery" &&
+      ticket_type !== "jackpot"
+    ) {
+      return json({
+        success: false,
+        message: "Invalid ticket type",
       }, 400);
     }
 
@@ -112,14 +128,31 @@ serve(async (req) => {
       },
     });
 
-    const { data: ticket, error: ticketError } = await admin
-      .from("ticket_purchases")
-      .select("id")
-      .eq("id", ticket_id)
-      .eq("user_id", authData.user.id)
-      .maybeSingle();
+    let ticket: { id: string } | null = null;
+    let ticketError: any = null;
 
-    // Database Error এবং Ticket Not Found আলাদা করা হয়েছে।
+    if (ticket_type === "lottery") {
+      const result = await admin
+        .from("ticket_purchases")
+        .select("id")
+        .eq("id", ticket_id)
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
+
+      ticket = result.data;
+      ticketError = result.error;
+    } else {
+      const result = await admin
+        .from("jackpot_tickets")
+        .select("id")
+        .eq("id", ticket_id)
+        .eq("user_id", authData.user.id)
+        .maybeSingle();
+
+      ticket = result.data;
+      ticketError = result.error;
+    }
+
     if (ticketError) {
       console.error(
         "QR ticket database query failed:",
@@ -151,6 +184,7 @@ serve(async (req) => {
       JSON.stringify({
         v: 1,
         ticket_id: ticket.id,
+        ticket_type,
       }),
     );
 
