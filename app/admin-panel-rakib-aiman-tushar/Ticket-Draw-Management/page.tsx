@@ -9,6 +9,7 @@ import AdminMenu from "../../../components/admin/AdminMenu";
 type TicketDraw = {
   id: string;
   draw_date: string;
+  draw_open_at?: string | null;
   status: "upcoming" | "open" | "completed";
   ticket_price: number | string;
   prize_amount: number | string;
@@ -67,6 +68,41 @@ function formatDate(value: string) {
   });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not set";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function toLocalDateTimeInput(value?: string | null, drawDate?: string) {
+  const date = value
+    ? new Date(value)
+    : new Date(`${drawDate || getLocalDate()}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return `${drawDate || getLocalDate()}T00:00`;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function getDrawRows(data: unknown): TicketDraw[] {
   if (Array.isArray(data)) return data as TicketDraw[];
 
@@ -108,6 +144,14 @@ export default function TicketDrawManagementPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingAction, setPendingAction] =
     useState<PendingAction | null>(null);
+
+  // NEW: Edit Draw States
+  const [editingDraw, setEditingDraw] = useState<TicketDraw | null>(null);
+  const [editDrawDate, setEditDrawDate] = useState("");
+  const [editDrawOpenAt, setEditDrawOpenAt] = useState("");
+  const [editTicketPrice, setEditTicketPrice] = useState("");
+  const [editPrizeAmount, setEditPrizeAmount] = useState("");
+  const [editTotalJackpot, setEditTotalJackpot] = useState("");
 
   async function handleLogout() {
     if (loggingOut) return;
@@ -294,6 +338,136 @@ export default function TicketDrawManagementPage() {
     }
   }
 
+  // NEW: Open Edit Modal
+  function openEditModal(draw: TicketDraw) {
+    setEditingDraw(draw);
+    setEditDrawDate(draw.draw_date);
+    setEditDrawOpenAt(
+      toLocalDateTimeInput(draw.draw_open_at, draw.draw_date)
+    );
+    setEditTicketPrice(String(draw.ticket_price ?? "0"));
+    setEditPrizeAmount(String(draw.prize_amount ?? "0"));
+    setEditTotalJackpot(String(draw.total_jackpot ?? "0"));
+    setNotice(null);
+  }
+
+  // NEW: Close Edit Modal
+  function closeEditModal() {
+    if (submitting) return;
+
+    setEditingDraw(null);
+    setEditDrawDate("");
+    setEditDrawOpenAt("");
+    setEditTicketPrice("");
+    setEditPrizeAmount("");
+    setEditTotalJackpot("");
+  }
+
+  // NEW: Update Draw
+  async function handleUpdateDraw(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
+    if (!editingDraw) return;
+
+    setNotice(null);
+
+    const price = Number(editTicketPrice);
+    const prize = Number(editPrizeAmount);
+    const jackpot = Number(editTotalJackpot);
+
+    if (!editDrawDate) {
+      setNotice({
+        type: "error",
+        text: "Draw Date নির্বাচন করুন।",
+      });
+      return;
+    }
+
+    if (!editDrawOpenAt) {
+      setNotice({
+        type: "error",
+        text: "Draw Opening Date ও Time নির্বাচন করুন।",
+      });
+      return;
+    }
+
+    if (
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      !Number.isFinite(prize) ||
+      prize <= 0 ||
+      !Number.isFinite(jackpot) ||
+      jackpot < 0
+    ) {
+      setNotice({
+        type: "error",
+        text: "Ticket Price, Prize Amount ও Jackpot সঠিকভাবে দিন।",
+      });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const openingDateTime = new Date(editDrawOpenAt);
+
+      if (Number.isNaN(openingDateTime.getTime())) {
+        throw new Error("Opening Date ও Time সঠিক নয়।");
+      }
+
+      const { data, error } = await client.rpc(
+        "admin_update_ticket_draw",
+        {
+          p_draw_id: editingDraw.id,
+          p_draw_date: editDrawDate,
+          p_draw_open_at: openingDateTime.toISOString(),
+          p_ticket_price: price,
+          p_prize_amount: prize,
+          p_total_jackpot: jackpot,
+        }
+      );
+
+      if (error) throw error;
+
+      if (
+        data &&
+        typeof data === "object" &&
+        "success" in data &&
+        (data as { success: boolean }).success === false
+      ) {
+        throw new Error(
+          String(
+            (data as { message?: string }).message ||
+              "Draw Update করা যায়নি।"
+          )
+        );
+      }
+
+      setEditingDraw(null);
+
+      setNotice({
+        type: "success",
+        text: "Draw-এর তথ্য সফলভাবে Update হয়েছে।",
+      });
+
+      await loadDraws();
+    } catch (error) {
+      console.error("Update draw error:", error);
+
+      setNotice({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Draw Update করা যায়নি।",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function executeAction() {
     if (!pendingAction) return;
 
@@ -415,6 +589,23 @@ export default function TicketDrawManagementPage() {
   const completedCount = draws.filter(
     (draw) => draw.status === "completed"
   ).length;
+
+  // NEW: Determine which financial fields can be edited
+  const editTicketCount = editingDraw
+    ? Number(
+        editingDraw.ticket_count ??
+          editingDraw.total_tickets_sold ??
+          0
+      )
+    : 0;
+
+  const completedEdit = editingDraw?.status === "completed";
+
+  const lockedOpenFinancials =
+    editingDraw?.status === "open" && editTicketCount > 0;
+
+  const financialFieldsDisabled =
+    Boolean(completedEdit || lockedOpenFinancials);
 
   return (
     <div className="tdm-page">
@@ -616,6 +807,13 @@ export default function TicketDrawManagementPage() {
 
                     <div className="tdm-draw-info">
                       <div>
+                        <span>Opening Date & Time</span>
+                        <strong>
+                          {formatDateTime(draw.draw_open_at)}
+                        </strong>
+                      </div>
+
+                      <div>
                         <span>Ticket Price</span>
                         <strong>৳{money(draw.ticket_price)}</strong>
                       </div>
@@ -638,6 +836,15 @@ export default function TicketDrawManagementPage() {
                     </div>
 
                     <div className="tdm-draw-actions">
+                      <button
+                        type="button"
+                        className="tdm-edit-button"
+                        disabled={submitting}
+                        onClick={() => openEditModal(draw)}
+                      >
+                        ✎ EDIT DRAW
+                      </button>
+
                       {draw.status === "upcoming" && (
                         <button
                           type="button"
@@ -692,6 +899,147 @@ export default function TicketDrawManagementPage() {
           </p>
         </div>
       </main>
+
+      {/* NEW: EDIT DRAW MODAL */}
+      {editingDraw && (
+        <div
+          className="tdm-modal-backdrop"
+          onClick={() => {
+            if (!submitting) closeEditModal();
+          }}
+        >
+          <div
+            className="tdm-edit-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="tdm-edit-modal-heading">
+              <div>
+                <span className="tdm-section-label">DRAW MANAGEMENT</span>
+                <h2>Edit Ticket Draw</h2>
+                <p>
+                  Status:{" "}
+                  <span className={`tdm-status ${editingDraw.status}`}>
+                    {editingDraw.status}
+                  </span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="tdm-edit-close"
+                disabled={submitting}
+                onClick={closeEditModal}
+              >
+                ×
+              </button>
+            </div>
+
+            {completedEdit && (
+              <div className="tdm-edit-info">
+                Completed Draw: শুধু Draw Date ও Opening Date/Time
+                পরিবর্তন করা যাবে। Prize ও Financial Records অপরিবর্তিত থাকবে।
+              </div>
+            )}
+
+            {lockedOpenFinancials && (
+              <div className="tdm-edit-info">
+                এই Open Draw-এ Ticket বিক্রি হয়েছে। Ticket Price ও
+                Prize Amount পরিবর্তন করা যাবে না।
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateDraw} className="tdm-edit-form">
+              <label>
+                Draw Date
+                <input
+                  type="date"
+                  value={editDrawDate}
+                  onChange={(event) =>
+                    setEditDrawDate(event.target.value)
+                  }
+                  required
+                />
+              </label>
+
+              <label>
+                Draw Opening Date & Time
+                <input
+                  type="datetime-local"
+                  value={editDrawOpenAt}
+                  onChange={(event) =>
+                    setEditDrawOpenAt(event.target.value)
+                  }
+                  required
+                />
+              </label>
+
+              <label>
+                Ticket Price (৳)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={editTicketPrice}
+                  onChange={(event) =>
+                    setEditTicketPrice(event.target.value)
+                  }
+                  disabled={financialFieldsDisabled}
+                  required
+                />
+              </label>
+
+              <label>
+                Prize Amount (৳)
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={editPrizeAmount}
+                  onChange={(event) =>
+                    setEditPrizeAmount(event.target.value)
+                  }
+                  disabled={financialFieldsDisabled}
+                  required
+                />
+              </label>
+
+              <label>
+                Total Jackpot (৳)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editTotalJackpot}
+                  onChange={(event) =>
+                    setEditTotalJackpot(event.target.value)
+                  }
+                  disabled={completedEdit}
+                  required
+                />
+              </label>
+
+              <div className="tdm-edit-modal-actions">
+                <button
+                  type="button"
+                  className="tdm-cancel-button"
+                  disabled={submitting}
+                  onClick={closeEditModal}
+                >
+                  CANCEL
+                </button>
+
+                <button
+                  type="submit"
+                  className="tdm-save-button"
+                  disabled={submitting}
+                >
+                  {submitting ? "SAVING..." : "SAVE CHANGES"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {pendingAction && (
         <div
@@ -1127,8 +1475,27 @@ export default function TicketDrawManagementPage() {
 
         .tdm-draw-actions {
           display: flex;
+          flex-wrap: wrap;
           gap: 9px;
           margin-top: 13px;
+        }
+
+        .tdm-edit-button {
+          width: 100%;
+          min-height: 43px;
+          border: 1px solid #39745a;
+          border-radius: 8px;
+          background: #1b4532;
+          color: #9af0bd;
+          padding: 11px 14px;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .tdm-edit-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .tdm-open-button {
@@ -1226,6 +1593,7 @@ export default function TicketDrawManagementPage() {
           justify-content: center;
           padding: 18px;
           background: #000000bb;
+          overflow-y: auto;
         }
 
         .tdm-modal {
@@ -1281,11 +1649,139 @@ export default function TicketDrawManagementPage() {
           color: #ffffff;
           font-size: 11px;
           font-weight: 900;
+          cursor: pointer;
         }
 
         .tdm-confirm-button {
           background: #00c878;
           color: #062318;
+        }
+
+        /* NEW: Edit Modal Styles */
+
+        .tdm-edit-modal {
+          width: 100%;
+          max-width: 460px;
+          max-height: 90vh;
+          overflow-y: auto;
+          padding: 20px;
+          border: 1px solid #3a5c48;
+          border-radius: 14px;
+          background: #173126;
+          box-shadow: 0 20px 70px #00000066;
+        }
+
+        .tdm-edit-modal-heading {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 17px;
+        }
+
+        .tdm-edit-modal-heading h2 {
+          margin: 7px 0;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .tdm-edit-modal-heading p {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          color: #a9c2b4;
+          font-size: 11px;
+          margin: 7px 0 0;
+        }
+
+        .tdm-edit-close {
+          width: 32px;
+          height: 32px;
+          flex-shrink: 0;
+          border: 1px solid #496655;
+          border-radius: 7px;
+          background: #203d2e;
+          color: #ffffff;
+          font-size: 22px;
+          cursor: pointer;
+        }
+
+        .tdm-edit-close:disabled {
+          opacity: 0.5;
+        }
+
+        .tdm-edit-info {
+          margin-bottom: 15px;
+          padding: 11px;
+          border: 1px solid #826b36;
+          border-radius: 8px;
+          background: #3c321c;
+          color: #ffdf9a;
+          font-size: 11px;
+          line-height: 1.7;
+        }
+
+        .tdm-edit-form {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 13px;
+        }
+
+        .tdm-edit-form label {
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
+          color: #b8cfc2;
+          font-size: 11px;
+          font-weight: 750;
+        }
+
+        .tdm-edit-form input {
+          width: 100%;
+          min-height: 45px;
+          padding: 10px 12px;
+          box-sizing: border-box;
+          background: #0e211a;
+          color: #ffffff;
+          border: 1px solid #345444;
+          border-radius: 8px;
+          font-size: 14px;
+          outline: none;
+          color-scheme: dark;
+        }
+
+        .tdm-edit-form input:focus {
+          border-color: #00c878;
+          box-shadow: 0 0 0 2px #00c87822;
+        }
+
+        .tdm-edit-form input:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          background: #172a20;
+        }
+
+        .tdm-edit-modal-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 9px;
+          margin-top: 9px;
+        }
+
+        .tdm-save-button {
+          min-height: 43px;
+          border: 0;
+          border-radius: 7px;
+          background: #00c878;
+          color: #062318;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .tdm-save-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         @media (min-width: 650px) {
@@ -1306,7 +1802,15 @@ export default function TicketDrawManagementPage() {
           }
 
           .tdm-draw-info {
-            grid-template-columns: repeat(5, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .tdm-edit-form {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .tdm-edit-modal-actions {
+            grid-column: 1 / -1;
           }
         }
       `}</style>
