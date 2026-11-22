@@ -173,58 +173,94 @@ export default function WinnerSelectionPage() {
               viewBox="0 0 180 160"
               className="loading-svg"
               xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="Loading winner results"
             >
               <circle
                 cx="90"
-                cy="68"
-                r="48"
+                cy="70"
+                r="43"
                 fill="none"
-                stroke="#294a36"
-                strokeWidth="6"
+                stroke="rgba(255,255,255,0.15)"
+                strokeWidth="5"
               />
 
               <circle
                 className="loading-ring"
                 cx="90"
-                cy="68"
-                r="48"
+                cy="70"
+                r="43"
                 fill="none"
-                stroke="#49df91"
-                strokeWidth="6"
+                stroke="#ffffff"
+                strokeWidth="5"
                 strokeLinecap="round"
-                strokeDasharray="75 227"
+                strokeDasharray="72 198"
               />
 
-              <path
-                className="trophy-icon"
-                d="M65 37 H115 V56 C115 76 105 89 90 89 C75 89 65 76 65 56 Z"
-                fill="#f5c95c"
+              <g className="loading-trophy">
+                <path
+                  d="M66 39 H114 V57 C114 76 104 88 90 88 C76 88 66 76 66 57 Z"
+                  fill="#ffffff"
+                />
+
+                <path
+                  d="M66 47 H53 V55 C53 68 59 75 75 77"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M114 47 H127 V55 C127 68 121 75 105 77"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M90 88 V104 M74 109 H106 M79 104 H101"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  d="M90 47 L95 57 L106 59 L98 67 L100 78 L90 72 L80 78 L82 67 L74 59 L85 57 Z"
+                  fill="#172019"
+                />
+              </g>
+
+              <circle
+                className="loading-star"
+                cx="90"
+                cy="14"
+                r="3"
+                fill="#ffffff"
               />
 
-              <path
-                d="M65 45 H52 V53 C52 68 60 74 74 75 M115 45 H128 V53 C128 68 120 74 106 75"
-                fill="none"
-                stroke="#f5c95c"
-                strokeWidth="6"
-                strokeLinecap="round"
+              <circle
+                className="loading-star"
+                cx="145"
+                cy="70"
+                r="2.5"
+                fill="#ffffff"
               />
 
-              <path
-                d="M90 89 V105 M73 109 H107 M78 105 H102"
-                stroke="#f5c95c"
-                strokeWidth="6"
-                strokeLinecap="round"
-              />
-
-              <path
-                d="M90 45 L95 55 L106 57 L98 65 L100 76 L90 70 L80 76 L82 65 L74 57 L85 55 Z"
+              <circle
+                className="loading-star"
+                cx="35"
+                cy="70"
+                r="2.5"
                 fill="#ffffff"
               />
 
               <text
                 x="90"
-                y="139"
-                fill="#49df91"
+                y="145"
+                fill="#ffffff"
                 fontSize="11"
                 textAnchor="middle"
                 fontWeight="bold"
@@ -233,10 +269,6 @@ export default function WinnerSelectionPage() {
                 WINNER LOADING
               </text>
             </svg>
-          </div>
-
-          <div className="loading-progress">
-            <div className="loading-progress-fill" />
           </div>
 
           <p className="loading-message">
@@ -383,6 +415,16 @@ export default function WinnerSelectionPage() {
                                   Prize: {formatMoney(winner.prize_amount)}
                                 </span>
                               </div>
+
+                              <button
+                                className="verify-button"
+                                disabled={!winner.token}
+                                onClick={() =>
+                                  verifyTicket(winner.token)
+                                }
+                              >
+                                VERIFY DRAWS
+                              </button>
                             </div>
                           ))}
 
@@ -520,6 +562,8 @@ export default function WinnerSelectionPage() {
           padding: 22px 14px 30px;
         }
 
+        /* WHITE WINNER LOADING ANIMATION */
+
         .winner-loading {
           min-height: 65vh;
           display: flex;
@@ -544,37 +588,26 @@ export default function WinnerSelectionPage() {
         }
 
         .loading-ring {
-          transform-origin: 90px 68px;
-          animation: rotate-ring 1s linear infinite;
+          transform-origin: 90px 70px;
+          animation: rotate-ring 1.1s linear infinite;
         }
 
-        .trophy-icon {
-          transform-origin: 90px 68px;
-          animation: trophy-pulse 1s ease-in-out infinite alternate;
+        .loading-trophy {
+          transform-origin: 90px 70px;
+          animation: trophy-pulse 1.3s ease-in-out infinite alternate;
         }
 
-        .loading-progress {
-          width: 190px;
-          height: 5px;
-          background: #26392e;
-          border-radius: 20px;
-          overflow: hidden;
-          margin-top: 15px;
-        }
-
-        .loading-progress-fill {
-          width: 0%;
-          height: 100%;
-          background: #49df91;
-          border-radius: 20px;
-          animation: progress-fill 3.1s linear forwards;
+        .loading-star {
+          animation: star-pulse 1s ease-in-out infinite alternate;
         }
 
         .loading-message {
           margin-top: 17px;
-          color: #a9c5b3;
+          color: #ffffff;
           font-size: 12px;
-          letter-spacing: 0.5px;
+          letter-spacing: 0.8px;
+          font-weight: 700;
+          text-align: center;
         }
 
         @keyframes rotate-ring {
@@ -585,16 +618,21 @@ export default function WinnerSelectionPage() {
 
         @keyframes trophy-pulse {
           from {
-            transform: scale(0.94);
+            transform: scale(0.96);
           }
           to {
-            transform: scale(1.06);
+            transform: scale(1.05);
           }
         }
 
-        @keyframes progress-fill {
+        @keyframes star-pulse {
+          from {
+            opacity: 0.35;
+            transform: scale(0.8);
+          }
           to {
-            width: 100%;
+            opacity: 1;
+            transform: scale(1.2);
           }
         }
 
