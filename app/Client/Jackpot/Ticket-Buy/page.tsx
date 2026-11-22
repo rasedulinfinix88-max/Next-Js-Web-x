@@ -86,6 +86,10 @@ function JackpotTicketBuyContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+  const [qrError, setQrError] = useState("");
+
   const pendingRequestId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -178,6 +182,8 @@ function JackpotTicketBuyContent() {
 
     setError("");
     setSuccess("");
+    setQrUrl("");
+    setQrError("");
 
     if (draw.status !== "open") {
       setError("এই Jackpot-এর Ticket Sale বর্তমানে চালু নেই।");
@@ -264,8 +270,8 @@ function JackpotTicketBuyContent() {
         result?.balance_after ??
         result?.wallet_balance;
 
-      setTicket({
-        id: ticketId,
+      const purchasedTicket: PurchasedTicket = {
+        id: String(ticketId),
         ticket_number: ticketNumber
           ? String(ticketNumber)
           : "",
@@ -274,7 +280,9 @@ function JackpotTicketBuyContent() {
           ticketData?.price ||
           draw.ticket_price
         ),
-      });
+      };
+
+      setTicket(purchasedTicket);
 
       setProfile((previous) => {
         if (!previous) return previous;
@@ -302,11 +310,72 @@ function JackpotTicketBuyContent() {
           : previous
       );
 
+      // Purchase has succeeded. Do not repeat the purchase
+      // if QR generation fails.
       pendingRequestId.current = null;
 
       setSuccess(
         "অভিনন্দন! আপনার Jackpot Ticket সফলভাবে কেনা হয়েছে।"
       );
+
+      // Generate Jackpot QR using the purchased ticket ID.
+      if (!purchasedTicket.id) {
+        setQrError(
+          "Ticket কেনা সফল হয়েছে, কিন্তু Ticket ID পাওয়া যায়নি। QR তৈরি করা যায়নি।"
+        );
+        return;
+      }
+
+      setQrLoading(true);
+
+      try {
+        const { data: qrResponse, error: qrFunctionError } =
+          await supabase.functions.invoke("ticket-qr-create", {
+            body: {
+              ticket_id: purchasedTicket.id,
+              ticket_type: "jackpot",
+            },
+          });
+
+        if (qrFunctionError) {
+          let details = qrFunctionError.message;
+
+          const context = (
+            qrFunctionError as { context?: unknown }
+          ).context;
+
+          if (context instanceof Response) {
+            const body = await context.clone().text();
+            details =
+              `HTTP ${context.status}\n${body || details}`;
+          }
+
+          throw new Error(details);
+        }
+
+        if (!qrResponse?.success || !qrResponse?.token) {
+          throw new Error(
+            qrResponse?.message || "QR Token পাওয়া যায়নি।"
+          );
+        }
+
+        const verificationUrl =
+          `${window.location.origin}/verify-ticket?token=` +
+          encodeURIComponent(qrResponse.token);
+
+        const imageUrl =
+          "https://api.qrserver.com/v1/create-qr-code/" +
+          `?size=300x300&data=${encodeURIComponent(verificationUrl)}`;
+
+        setQrUrl(imageUrl);
+      } catch (qrErr: any) {
+        setQrError(
+          qrErr?.message ||
+            "Ticket কেনা হয়েছে, কিন্তু QR তৈরি করা যায়নি।"
+        );
+      } finally {
+        setQrLoading(false);
+      }
     } catch (err: any) {
       setError(
         err?.message || "Ticket Purchase ব্যর্থ হয়েছে।"
@@ -474,6 +543,50 @@ function JackpotTicketBuyContent() {
                   <p className="text-xs text-gray-400 mt-2">
                     Ticket Price: ৳{formatMoney(ticket.ticket_price)}
                   </p>
+
+                  <div className="mt-5 border-t border-white/10 pt-5">
+                    <p className="text-[#e9c477] text-sm font-bold">
+                      JACKPOT TICKET QR
+                    </p>
+
+                    {qrLoading && (
+                      <div className="py-8">
+                        <div className="w-9 h-9 mx-auto border-4 border-[#d6a94d] border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs text-gray-400 mt-3">
+                          GENERATING QR CODE...
+                        </p>
+                      </div>
+                    )}
+
+                    {qrUrl && (
+                      <div className="mt-4 bg-white rounded-xl p-3 inline-block">
+                        <img
+                          src={qrUrl}
+                          alt="Jackpot Ticket Verification QR Code"
+                          width={240}
+                          height={240}
+                          className="w-60 h-60 max-w-full object-contain"
+                        />
+                      </div>
+                    )}
+
+                    {qrError && (
+                      <div className="mt-4 rounded-lg border border-red-500/30 bg-red-950/30 p-3">
+                        <p className="text-red-300 text-xs">
+                          {qrError}
+                        </p>
+                        <p className="text-gray-400 text-xs mt-2">
+                          আপনার Ticket Purchase সফল হয়েছে। QR তৈরির সমস্যাটি আলাদাভাবে সমাধান করতে হবে।
+                        </p>
+                      </div>
+                    )}
+
+                    {qrUrl && (
+                      <p className="text-xs text-gray-400 mt-3">
+                        Scan this QR code to verify your Jackpot Ticket.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
