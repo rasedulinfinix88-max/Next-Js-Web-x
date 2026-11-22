@@ -12,17 +12,21 @@ import { useSearchParams } from "next/navigation";
 import JsBarcode from "jsbarcode";
 import { supabase } from "../../lib/supabase/client";
 
+type TicketType = "lottery" | "jackpot";
+
 type VerifiedTicket = {
   ticket_number: string;
   draw_date: string;
   purchase_status: string;
   winner_status: string;
+  ticket_type: TicketType;
+  prize_amount: number;
 };
 
 function formatDrawDate(value: string) {
   if (!value) return "Not Available";
 
-  const date = new Date(value + "T00:00:00");
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) return value;
 
@@ -31,6 +35,12 @@ function formatDrawDate(value: string) {
     month: "long",
     year: "numeric",
   });
+}
+
+function formatPrize(value: number) {
+  return new Intl.NumberFormat("en-BD", {
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 function TicketVerificationContent() {
@@ -42,20 +52,37 @@ function TicketVerificationContent() {
   const [loading, setLoading] = useState(Boolean(token));
   const [searching, setSearching] = useState(false);
   const [ticketNumber, setTicketNumber] = useState("");
+  const [ticketType, setTicketType] =
+    useState<TicketType>("lottery");
   const [ticket, setTicket] = useState<VerifiedTicket | null>(null);
   const [error, setError] = useState("");
 
   function applyVerifiedTicket(result: any) {
     if (!result?.success || !result?.valid || !result?.ticket) {
-      throw new Error(result?.message || "Invalid Ticket. Ticket not found.");
+      throw new Error(
+        result?.message || "Invalid Ticket. Ticket not found."
+      );
     }
+
+    const verifiedType =
+      result.ticket.ticket_type === "jackpot"
+        ? "jackpot"
+        : "lottery";
 
     setTicket({
       ticket_number: String(result.ticket.ticket_number || ""),
       draw_date: String(result.ticket.draw_date || ""),
-      purchase_status: String(result.ticket.purchase_status || "Unknown"),
-      winner_status: String(result.ticket.winner_status || "Unknown"),
+      purchase_status: String(
+        result.ticket.purchase_status || "Unknown"
+      ),
+      winner_status: String(
+        result.ticket.winner_status || "Unknown"
+      ),
+      ticket_type: verifiedType,
+      prize_amount: Number(result.ticket.prize_amount || 0),
     });
+
+    setTicketType(verifiedType);
   }
 
   useEffect(() => {
@@ -82,13 +109,17 @@ function TicketVerificationContent() {
         const result = data?.data ?? data;
 
         if (!result?.success || !result?.valid || !result?.ticket) {
-          throw new Error(result?.message || "Invalid or unverified ticket.");
+          throw new Error(
+            result?.message || "Invalid or unverified ticket."
+          );
         }
 
         if (active) applyVerifiedTicket(result);
       } catch (err: any) {
         if (active) {
-          setError(err?.message || "Ticket verification failed.");
+          setError(
+            err?.message || "Ticket verification failed."
+          );
         }
       } finally {
         if (active) setLoading(false);
@@ -102,7 +133,9 @@ function TicketVerificationContent() {
     };
   }, [token]);
 
-  async function handleManualSearch(event: FormEvent<HTMLFormElement>) {
+  async function handleManualSearch(
+    event: FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     const cleanNumber = ticketNumber.trim();
@@ -120,7 +153,10 @@ function TicketVerificationContent() {
     try {
       const { data, error: functionError } =
         await supabase.functions.invoke("ticket-verify-public", {
-          body: { ticket_number: cleanNumber },
+          body: {
+            ticket_number: cleanNumber,
+            ticket_type: ticketType,
+          },
         });
 
       if (functionError) throw new Error(functionError.message);
@@ -128,7 +164,9 @@ function TicketVerificationContent() {
       const result = data?.data ?? data;
       applyVerifiedTicket(result);
     } catch (err: any) {
-      setError(err?.message || "Ticket verification failed.");
+      setError(
+        err?.message || "Ticket verification failed."
+      );
     } finally {
       setSearching(false);
     }
@@ -157,6 +195,8 @@ function TicketVerificationContent() {
   function handlePrint() {
     window.print();
   }
+
+  const isJackpot = ticket?.ticket_type === "jackpot";
 
   return (
     <main className="verification-page">
@@ -190,14 +230,26 @@ function TicketVerificationContent() {
           width: 100%;
           overflow: hidden;
           border-radius: 8px;
+          color: #292929;
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        .ticket-card.lottery {
           background: linear-gradient(
             155deg,
             #ff514c 0%,
             #d91e2b 48%,
             #8e071b 100%
           );
-          color: #292929;
-          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        .ticket-card.jackpot {
+          background: linear-gradient(
+            155deg,
+            #e8bd55 0%,
+            #b98521 48%,
+            #65410b 100%
+          );
         }
 
         .ticket-header {
@@ -265,6 +317,11 @@ function TicketVerificationContent() {
           padding-bottom: 7px;
           border-bottom: 2px solid #d51d31;
           margin-bottom: 8px;
+        }
+
+        .ticket-card.jackpot .ticket-section-title {
+          color: #80520b;
+          border-bottom-color: #c18b24;
         }
 
         .ticket-info-row {
@@ -340,6 +397,10 @@ function TicketVerificationContent() {
           color: #ffe5e5;
         }
 
+        .ticket-card.jackpot .ticket-footer-note {
+          color: #fff2d1;
+        }
+
         .print-button {
           width: 100%;
           margin-top: 13px;
@@ -363,6 +424,30 @@ function TicketVerificationContent() {
           color: #00e701;
           font-weight: bold;
           cursor: pointer;
+        }
+
+        .type-selector {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+
+        .type-option {
+          flex: 1;
+          padding: 11px 6px;
+          border: 1px solid #42634d;
+          border-radius: 8px;
+          background: #101a14;
+          color: #b7c5bb;
+          font-size: 12px;
+          font-weight: bold;
+          cursor: pointer;
+        }
+
+        .type-option.selected {
+          background: #00e701;
+          border-color: #00e701;
+          color: #102016;
         }
 
         @media print {
@@ -459,7 +544,7 @@ function TicketVerificationContent() {
               color: "#00E701",
             }}
           >
-            LOTTERY
+            {isJackpot ? "JACKPOT" : "LOTTERY"}
           </h1>
 
           <p style={{ color: "#b7c5bb", fontSize: 11 }}>
@@ -481,13 +566,37 @@ function TicketVerificationContent() {
                 marginBottom: 12,
               }}
             >
-              Enter your ticket number to verify its authenticity.
+              Select ticket type and enter your ticket number.
             </p>
+
+            <div className="type-selector">
+              <button
+                type="button"
+                className={`type-option ${
+                  ticketType === "lottery" ? "selected" : ""
+                }`}
+                onClick={() => setTicketType("lottery")}
+              >
+                LOTTERY
+              </button>
+
+              <button
+                type="button"
+                className={`type-option ${
+                  ticketType === "jackpot" ? "selected" : ""
+                }`}
+                onClick={() => setTicketType("jackpot")}
+              >
+                JACKPOT
+              </button>
+            </div>
 
             <input
               type="text"
               value={ticketNumber}
-              onChange={(event) => setTicketNumber(event.target.value)}
+              onChange={(event) =>
+                setTicketNumber(event.target.value)
+              }
               placeholder="Enter Ticket Number"
               autoComplete="off"
               style={{
@@ -591,11 +700,24 @@ function TicketVerificationContent() {
 
         {!loading && !searching && ticket && (
           <div style={{ marginTop: 15 }}>
-            <div className="ticket-card">
+            <div
+              className={`ticket-card ${
+                ticket.ticket_type === "jackpot"
+                  ? "jackpot"
+                  : "lottery"
+              }`}
+            >
               <div className="ticket-header">
-                <div className="ticket-brand">LOTTO</div>
+                <div className="ticket-brand">
+                  {ticket.ticket_type === "jackpot"
+                    ? "JACKPOT"
+                    : "LOTTO"}
+                </div>
+
                 <div className="ticket-subtitle">
-                  Official Lottery Ticket
+                  {ticket.ticket_type === "jackpot"
+                    ? "Official Jackpot Ticket"
+                    : "Official Lottery Ticket"}
                 </div>
               </div>
 
@@ -603,6 +725,7 @@ function TicketVerificationContent() {
                 <span className="ticket-number-label">
                   TICKET NUMBER
                 </span>
+
                 <strong className="ticket-number-value">
                   {ticket.ticket_number}
                 </strong>
@@ -614,38 +737,59 @@ function TicketVerificationContent() {
                 </div>
 
                 <div className="ticket-info-row">
-                  <div className="ticket-info-label">Ticket Number</div>
+                  <div className="ticket-info-label">
+                    Ticket Number
+                  </div>
                   <div className="ticket-info-value">
                     {ticket.ticket_number}
                   </div>
                 </div>
 
                 <div className="ticket-info-row">
-                  <div className="ticket-info-label">Draw Date</div>
+                  <div className="ticket-info-label">
+                    Draw Date
+                  </div>
                   <div className="ticket-info-value">
                     {formatDrawDate(ticket.draw_date)}
                   </div>
                 </div>
 
                 <div className="ticket-info-row">
-                  <div className="ticket-info-label">Purchase Status</div>
+                  <div className="ticket-info-label">
+                    Purchase Status
+                  </div>
                   <div className="ticket-info-value">
                     {ticket.purchase_status}
                   </div>
                 </div>
 
                 <div className="ticket-info-row">
-                  <div className="ticket-info-label">Winner Status</div>
+                  <div className="ticket-info-label">
+                    Winner Status
+                  </div>
                   <div className="ticket-info-value">
                     {ticket.winner_status}
                   </div>
                 </div>
+
+                {ticket.ticket_type === "jackpot" &&
+                  ticket.prize_amount > 0 && (
+                    <div className="ticket-info-row">
+                      <div className="ticket-info-label">
+                        Prize Amount
+                      </div>
+                      <div className="ticket-info-value">
+                        ৳{formatPrize(ticket.prize_amount)}
+                      </div>
+                    </div>
+                  )}
 
                 <div className="barcode-area">
                   <svg
                     ref={barcodeRef}
                     className="ticket-barcode"
                   />
+
                   <div className="barcode-number">
                     {ticket.ticket_number}
                   </div>
@@ -682,6 +826,7 @@ function TicketVerificationContent() {
                     setTicket(null);
                     setTicketNumber("");
                     setError("");
+                    setTicketType("lottery");
                   }}
                 >
                   VERIFY ANOTHER TICKET
