@@ -86,10 +86,26 @@ export default function JackpotManagementPage() {
         );
 
       if (functionError) {
-        throw new Error(functionError.message);
+        let details = functionError.message;
+
+        const context = (
+          functionError as { context?: unknown }
+        ).context;
+
+        if (context instanceof Response) {
+          const body = await context.clone().text();
+
+          details =
+            `HTTP Status: ${context.status}\n` +
+            `Status Text: ${context.statusText}\n\n` +
+            `Backend Response:\n${body || functionError.message}`;
+        }
+
+        throw new Error(details);
       }
 
       setResponse(JSON.stringify(data, null, 2));
+
     } catch (err) {
       setError(
         err instanceof Error
@@ -172,9 +188,10 @@ export default function JackpotManagementPage() {
           {error && (
             <div className="mt-5 rounded-xl border border-red-800 bg-red-950/30 p-4">
               <h3 className="font-semibold text-red-400">
-                API Error
+                API Error Details
               </h3>
-              <pre className="mt-2 whitespace-pre-wrap break-words text-xs text-red-300">
+
+              <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 text-xs leading-6 text-red-300">
                 {error}
               </pre>
             </div>
@@ -185,6 +202,7 @@ export default function JackpotManagementPage() {
               <h3 className="font-semibold text-green-400">
                 API Response
               </h3>
+
               <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-black/40 p-3 text-xs leading-6 text-gray-200">
                 {response}
               </pre>
