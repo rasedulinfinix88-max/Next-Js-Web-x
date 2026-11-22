@@ -127,7 +127,10 @@ serve(async (req) => {
       },
     });
 
-    // শুধু Completed Draw নেওয়া হবে।
+    // ==========================================
+    // OLD WINNER HISTORY - EXISTING LOGIC
+    // ==========================================
+
     const { data: draws, error: drawError } = await admin
       .from("ticket_draws")
       .select("id, draw_date, total_jackpot")
@@ -143,21 +146,13 @@ serve(async (req) => {
       }, 500);
     }
 
-    if (!draws || draws.length === 0) {
-      return json({
-        success: true,
-        draws: [],
-      });
-    }
-
     const result = [];
 
-    for (const draw of draws) {
+    for (const draw of draws || []) {
       const winners = [];
       let start = 0;
       const pageSize = 1000;
 
-      // একটি Draw-এর সব Winner সংগ্রহ।
       while (true) {
         const { data: tickets, error: ticketError } = await admin
           .from("ticket_purchases")
@@ -198,7 +193,6 @@ serve(async (req) => {
         continue;
       }
 
-      // Winner User ID সংগ্রহ।
       const userIds = [
         ...new Set(
           winners.map((ticket) => ticket.user_id),
@@ -207,7 +201,6 @@ serve(async (req) => {
 
       const profilesById = new Map<string, string>();
 
-      // বড় User List হলে ছোট ছোট ভাগে Profile পড়া।
       for (let i = 0; i < userIds.length; i += 500) {
         const userBatch = userIds.slice(i, i + 500);
 
@@ -258,7 +251,6 @@ serve(async (req) => {
         });
       }
 
-      // একই Draw-এর Winner A-Z অনুযায়ী সাজানো।
       drawWinners.sort((a, b) =>
         a.sort_name.localeCompare(
           b.sort_name,
@@ -278,10 +270,147 @@ serve(async (req) => {
       });
     }
 
+    // ==========================================
+    // NEW JACKPOT WINNING HISTORY
+    // ==========================================
+
+    const jackpotResult = [];
+
+    const { data: publishedResults, error: jackpotError } =
+      await admin
+        .from("jackpot_draw_results")
+        .select(
+          "draw_id, winning_ticket_id, winning_ticket_number, winner_user_id, prize_amount, published_at",
+        )
+        .eq("result_status", "published")
+        .order("published_at", { ascending: false });
+
+    if (jackpotError) {
+      console.error(
+        "Jackpot result query failed:",
+        jackpotError.message,
+      );
+
+      return json({
+        success: false,
+        message: "Could not load Jackpot history",
+      }, 500);
+    }
+
+    if (publishedResults && publishedResults.length > 0) {
+      const drawIds = [
+        ...new Set(
+          publishedResults.map((item) => item.draw_id),
+        ),
+      ];
+
+      const { data: jackpotDraws, error: jackpotDrawError } =
+        await admin
+          .from("jackpot_draws")
+          .select(
+            "id, category, ticket_price, prize_amount, draw_at, status, total_tickets_sold",
+          )
+          .in("id", drawIds)
+          .eq("status", "published");
+
+      if (jackpotDrawError) {
+        console.error(
+          "Jackpot draw query failed:",
+          jackpotDrawError.message,
+        );
+
+        return json({
+          success: false,
+          message: "Could not load Jackpot draw details",
+        }, 500);
+      }
+
+      const jackpotDrawById = new Map(
+        (jackpotDraws || []).map((draw) => [draw.id, draw]),
+      );
+
+      const jackpotUserIds = [
+        ...new Set(
+          publishedResults.map((item) => item.winner_user_id),
+        ),
+      ];
+
+      const jackpotProfilesById = new Map<string, string>();
+
+      for (let i = 0; i < jackpotUserIds.length; i += 500) {
+        const userBatch = jackpotUserIds.slice(i, i + 500);
+
+        const { data: profiles, error: profileError } = await admin
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userBatch);
+
+        if (profileError) {
+          console.error(
+            "Jackpot winner profile query failed:",
+            profileError.message,
+          );
+
+          return json({
+            success: false,
+            message: "Could not load Jackpot winner names",
+          }, 500);
+        }
+
+        for (const profile of profiles || []) {
+          jackpotProfilesById.set(
+            profile.id,
+            profile.full_name || "",
+          );
+        }
+      }
+
+      for (const item of publishedResults) {
+        const draw = jackpotDrawById.get(item.draw_id);
+
+        if (!draw) {
+          continue;
+        }
+
+        const fullName =
+          jackpotProfilesById.get(item.winner_user_id) || "";
+
+        const token = await createTicketToken(
+          item.winning_ticket_id,
+          serviceKey,
+        );
+
+        jackpotResult.push({
+          draw_id: item.draw_id,
+          category: draw.category,
+          draw_date: draw.draw_at,
+          ticket_price: draw.ticket_price,
+          total_jackpot: draw.prize_amount,
+          total_tickets_sold: draw.total_tickets_sold,
+          published_at: item.published_at,
+          winners: [
+            {
+              ticket_id: item.winning_ticket_id,
+              ticket_number: item.winning_ticket_number,
+              ticket_price: draw.ticket_price,
+              prize_amount: item.prize_amount,
+              winner_name_masked: maskWinnerName(fullName),
+              token,
+            },
+          ],
+        });
+      }
+    }
+
+    // OLD "draws" response preserved.
+    // NEW "jackpot_draws" response added.
+
     return json({
       success: true,
       draws: result,
+      jackpot_draws: jackpotResult,
     });
+
   } catch (error) {
     console.error(
       "Public winner list error:",
