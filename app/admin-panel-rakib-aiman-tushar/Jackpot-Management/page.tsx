@@ -14,6 +14,7 @@ export default function JackpotManagementPage() {
   const [adminAllowed, setAdminAllowed] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [testingWinner, setTestingWinner] = useState(false);
   const [response, setResponse] = useState("");
   const [error, setError] = useState("");
 
@@ -58,54 +59,61 @@ export default function JackpotManagementPage() {
     }
   }
 
+  async function runApiTest(
+    action: string,
+    body: Record<string, string>
+  ) {
+    const supabase = createClient();
+
+    const { data: sessionData } =
+      await supabase.auth.getSession();
+
+    if (!sessionData.session?.access_token) {
+      throw new Error(
+        "Login session পাওয়া যায়নি। আবার Admin Login করুন।"
+      );
+    }
+
+    const { data, error: functionError } =
+      await supabase.functions.invoke(
+        "jackpot-manager",
+        {
+          body: {
+            action,
+            ...body
+          }
+        }
+      );
+
+    if (functionError) {
+      let details = functionError.message;
+
+      const context = (
+        functionError as { context?: unknown }
+      ).context;
+
+      if (context instanceof Response) {
+        const responseBody = await context.clone().text();
+
+        details =
+          `HTTP Status: ${context.status}\n` +
+          `Status Text: ${context.statusText}\n\n` +
+          `Backend Response:\n${responseBody || functionError.message}`;
+      }
+
+      throw new Error(details);
+    }
+
+    setResponse(JSON.stringify(data, null, 2));
+  }
+
   async function testDrawList() {
     setTesting(true);
     setError("");
     setResponse("");
 
     try {
-      const supabase = createClient();
-
-      const { data: sessionData } =
-        await supabase.auth.getSession();
-
-      if (!sessionData.session?.access_token) {
-        throw new Error(
-          "Login session পাওয়া যায়নি। আবার Admin Login করুন।"
-        );
-      }
-
-      const { data, error: functionError } =
-        await supabase.functions.invoke(
-          "jackpot-manager",
-          {
-            body: {
-              action: "admin_list_draws"
-            }
-          }
-        );
-
-      if (functionError) {
-        let details = functionError.message;
-
-        const context = (
-          functionError as { context?: unknown }
-        ).context;
-
-        if (context instanceof Response) {
-          const body = await context.clone().text();
-
-          details =
-            `HTTP Status: ${context.status}\n` +
-            `Status Text: ${context.statusText}\n\n` +
-            `Backend Response:\n${body || functionError.message}`;
-        }
-
-        throw new Error(details);
-      }
-
-      setResponse(JSON.stringify(data, null, 2));
-
+      await runApiTest("admin_list_draws", {});
     } catch (err) {
       setError(
         err instanceof Error
@@ -114,6 +122,29 @@ export default function JackpotManagementPage() {
       );
     } finally {
       setTesting(false);
+    }
+  }
+
+  async function testRandomWinner() {
+    setTestingWinner(true);
+    setError("");
+    setResponse("");
+
+    try {
+      await runApiTest(
+        "admin_select_random_winner",
+        {
+          p_draw_id: "00000000-0000-4000-8000-000000000000"
+        }
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Winner Selection API পরীক্ষা ব্যর্থ হয়েছে।"
+      );
+    } finally {
+      setTestingWinner(false);
     }
   }
 
@@ -168,20 +199,41 @@ export default function JackpotManagementPage() {
             </h3>
 
             <p className="mt-2 text-xs leading-6 text-gray-400">
-              এই পরীক্ষার মাধ্যমে Backend থেকে Jackpot Draw
-              List পাওয়া যাচ্ছে কি না যাচাই করা হবে।
-              এতে কোনো Draw তৈরি বা পরিবর্তন হবে না।
+              Backend থেকে Jackpot Draw List পাওয়া যাচ্ছে কি না
+              যাচাই করা হবে। এতে কোনো Draw তৈরি বা পরিবর্তন হবে না।
             </p>
 
             <button
               type="button"
               onClick={testDrawList}
-              disabled={testing}
+              disabled={testing || testingWinner}
               className="mt-5 w-full rounded-lg bg-green-600 px-4 py-3 font-bold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {testing
                 ? "Testing API..."
                 : "Test Jackpot Draw List"}
+            </button>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-yellow-800 bg-[#07110d] p-4">
+            <h3 className="font-semibold text-yellow-400">
+              Random Winner Selection API Test
+            </h3>
+
+            <p className="mt-2 text-xs leading-6 text-gray-400">
+              একটি কাল্পনিক Draw ID দিয়ে API পরীক্ষা করা হবে।
+              এই পরীক্ষায় কোনো আসল Draw বা Winner পরিবর্তন হবে না।
+            </p>
+
+            <button
+              type="button"
+              onClick={testRandomWinner}
+              disabled={testing || testingWinner}
+              className="mt-5 w-full rounded-lg bg-yellow-600 px-4 py-3 font-bold text-black transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {testingWinner
+                ? "Testing Winner API..."
+                : "Test Random Winner Selection"}
             </button>
           </div>
 
