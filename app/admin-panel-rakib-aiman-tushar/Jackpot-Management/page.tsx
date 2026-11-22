@@ -15,6 +15,7 @@ export default function JackpotManagementPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingWinner, setTestingWinner] = useState(false);
+  const [testingPublish, setTestingPublish] = useState(false);
   const [response, setResponse] = useState("");
   const [error, setError] = useState("");
 
@@ -148,6 +149,32 @@ export default function JackpotManagementPage() {
     }
   }
 
+  async function testPublishResult() {
+    setTestingPublish(true);
+    setError("");
+    setResponse("");
+
+    try {
+      await runApiTest(
+        "admin_publish_result",
+        {
+          p_draw_id: "00000000-0000-4000-8000-000000000000"
+        }
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Publish Result API পরীক্ষা ব্যর্থ হয়েছে।"
+      );
+    } finally {
+      setTestingPublish(false);
+    }
+  }
+
+  const anyTesting =
+    testing || testingWinner || testingPublish;
+
   if (checking || !adminAllowed) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#07110d]">
@@ -206,7 +233,7 @@ export default function JackpotManagementPage() {
             <button
               type="button"
               onClick={testDrawList}
-              disabled={testing || testingWinner}
+              disabled={anyTesting}
               className="mt-5 w-full rounded-lg bg-green-600 px-4 py-3 font-bold text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {testing
@@ -221,19 +248,41 @@ export default function JackpotManagementPage() {
             </h3>
 
             <p className="mt-2 text-xs leading-6 text-gray-400">
-              একটি কাল্পনিক Draw ID দিয়ে API পরীক্ষা করা হবে।
-              এই পরীক্ষায় কোনো আসল Draw বা Winner পরিবর্তন হবে না।
+              কাল্পনিক Draw ID দিয়ে পরীক্ষা হবে।
+              কোনো আসল Winner নির্বাচন হবে না।
             </p>
 
             <button
               type="button"
               onClick={testRandomWinner}
-              disabled={testing || testingWinner}
+              disabled={anyTesting}
               className="mt-5 w-full rounded-lg bg-yellow-600 px-4 py-3 font-bold text-black transition hover:bg-yellow-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {testingWinner
                 ? "Testing Winner API..."
                 : "Test Random Winner Selection"}
+            </button>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-blue-800 bg-[#07110d] p-4">
+            <h3 className="font-semibold text-blue-400">
+              Publish Result API Test
+            </h3>
+
+            <p className="mt-2 text-xs leading-6 text-gray-400">
+              কাল্পনিক Draw ID দিয়ে Result Publish API পরীক্ষা হবে।
+              কোনো আসল Result প্রকাশ বা পরিবর্তন হবে না।
+            </p>
+
+            <button
+              type="button"
+              onClick={testPublishResult}
+              disabled={anyTesting}
+              className="mt-5 w-full rounded-lg bg-blue-600 px-4 py-3 font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {testingPublish
+                ? "Testing Publish API..."
+                : "Test Publish Result"}
             </button>
           </div>
 
