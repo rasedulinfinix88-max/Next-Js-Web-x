@@ -345,6 +345,64 @@ Deno.serve(async (req: Request) => {
     }
 
     // =================================================
+    // ADMIN ACTION 6: RANDOM WINNER SELECTION
+    // =================================================
+
+    if (action === "admin_select_random_winner") {
+      if (!isUUID(body?.draw_id)) {
+        return response(
+          { success: false, message: "Invalid draw ID" },
+          400,
+        );
+      }
+
+      const { data, error } = await supabase.rpc(
+        "jackpot_v2_admin_select_random_winner",
+        {
+          p_draw_id: body.draw_id,
+        },
+      );
+
+      if (error) {
+        return response(
+          { success: false, message: error.message },
+          400,
+        );
+      }
+
+      return response(data);
+    }
+
+    // =================================================
+    // ADMIN ACTION 7: PUBLISH WINNER RESULT
+    // =================================================
+
+    if (action === "admin_publish_result") {
+      if (!isUUID(body?.draw_id)) {
+        return response(
+          { success: false, message: "Invalid draw ID" },
+          400,
+        );
+      }
+
+      const { data, error } = await supabase.rpc(
+        "jackpot_v2_admin_publish_result",
+        {
+          p_draw_id: body.draw_id,
+        },
+      );
+
+      if (error) {
+        return response(
+          { success: false, message: error.message },
+          400,
+        );
+      }
+
+      return response(data);
+    }
+
+    // =================================================
     // UNKNOWN ACTION
     // =================================================
 
