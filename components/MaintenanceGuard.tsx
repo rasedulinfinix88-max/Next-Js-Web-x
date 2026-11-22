@@ -7,8 +7,7 @@ import { useSiteSettings } from "../lib/SiteSettingsContext";
 
 const BASE_PATH = "/Next-Js-Web-x";
 
-const ADMIN_PATH =
-  "/admin-panel-rakib-aiman-tushar/maintenance-for-faster";
+const ADMIN_PATH = "/admin-panel-rakib-aiman-tushar";
 
 function normalizePath(path: string) {
   let result = path.split("?")[0].toLowerCase();
@@ -42,6 +41,10 @@ export default function MaintenanceGuard({
 
   const currentPath = normalizePath(pathname || "/");
 
+  const isAdminPage =
+    currentPath === ADMIN_PATH ||
+    currentPath.startsWith(ADMIN_PATH + "/");
+
   const isMaintenancePage =
     currentPath === "/maintenance" ||
     currentPath.startsWith("/maintenance/");
@@ -50,17 +53,13 @@ export default function MaintenanceGuard({
     currentPath === "/client/login" ||
     currentPath.startsWith("/client/login/");
 
-  const isAdminPage =
-    currentPath === ADMIN_PATH ||
-    currentPath.startsWith(ADMIN_PATH + "/");
-
   useEffect(() => {
     if (isLoading || !maintenanceMode) return;
 
-    // Admin Panel-কে Maintenance Redirect থেকে বাদ দেওয়া হচ্ছে।
+    // সম্পূর্ণ Admin Route Maintenance Redirect থেকে মুক্ত।
     if (isAdminPage) return;
 
-    // Maintenance ও Login Page সবসময় প্রবেশযোগ্য থাকবে।
+    // Maintenance এবং User Login Page প্রবেশযোগ্য থাকবে।
     if (isMaintenancePage || isLoginPage) return;
 
     window.location.replace(
