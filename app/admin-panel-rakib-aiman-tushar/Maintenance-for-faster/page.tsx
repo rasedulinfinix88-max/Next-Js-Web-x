@@ -29,6 +29,7 @@ export default function MaintenanceAdminPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+  // Admin verification: Maintenance Mode থেকে স্বাধীন
   useEffect(() => {
     if (isLoading) return;
 
@@ -41,9 +42,9 @@ export default function MaintenanceAdminPage() {
 
         if (sessionError || !sessionData.session) {
           if (active) {
-            router.replace(
-              maintenanceMode ? "/maintenance/" : "/Client/Login/"
-            );
+            setAuthorized(false);
+            setChecking(false);
+            router.replace("/Client/Login/");
           }
           return;
         }
@@ -68,10 +69,7 @@ export default function MaintenanceAdminPage() {
         if (!isAuthorized) {
           setAuthorized(false);
           setChecking(false);
-
-          router.replace(
-            maintenanceMode ? "/maintenance/" : "/"
-          );
+          router.replace("/");
           return;
         }
 
@@ -81,10 +79,7 @@ export default function MaintenanceAdminPage() {
         if (active) {
           setAuthorized(false);
           setChecking(false);
-
-          router.replace(
-            maintenanceMode ? "/maintenance/" : "/"
-          );
+          router.replace("/");
         }
       }
     }
@@ -94,7 +89,7 @@ export default function MaintenanceAdminPage() {
     return () => {
       active = false;
     };
-  }, [router, isLoading, maintenanceMode]);
+  }, [router, isLoading]);
 
   useEffect(() => {
     if (isLoading) return;
