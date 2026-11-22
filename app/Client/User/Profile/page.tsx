@@ -359,10 +359,6 @@ export default function ProfilePage() {
     router.push("/Support-center/");
   }
 
-  function status(value: boolean | null | undefined) {
-    return value ? "Verified" : "Not Verified";
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0d241e]">
@@ -547,8 +543,6 @@ export default function ProfilePage() {
             <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4">
               <h2 className="font-bold mb-4">Account Verification</h2>
               {[
-                ["Address Verification", status(profile.address_verified)],
-                ["Identity Verification", status(profile.identification_verified)],
                 ["Lottery Fee", profile.user_lottery_fee_paid ? "Paid" : "Not Paid"],
                 ["Terms Accepted", profile.user_lottery_is_terms_accepted ? "Yes" : "No"],
               ].map(([label, value]) => (
@@ -642,11 +636,7 @@ export default function ProfilePage() {
             <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4">
               <h2 className="font-bold mb-3">Account Information</h2>
               <div className="flex justify-between py-2">
-                <span className="text-xs text-[#a9b9ae]">Account Role</span>
-                <span className="text-xs">{profile.user_role || "user"}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-[#a9b9ae]">Created Date</span>
+                <span className="text-xs text-[#a9b9ae]">Join Date</span>
                 <span className="text-xs">
                   {profile.created_at
                     ? new Date(profile.created_at).toLocaleDateString("en-GB")
@@ -654,16 +644,6 @@ export default function ProfilePage() {
                 </span>
               </div>
             </section>
-
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                router.replace("/user/login/");
-              }}
-              className="w-full rounded-xl border border-red-800 bg-red-950/40 text-red-300 font-bold py-3"
-            >
-              LOG OUT
-            </button>
           </>
         )}
       </main>
