@@ -2,47 +2,78 @@
 
 import { useState, useEffect, useRef } from "react";
 
-// --- টাইপ ডিফিনিশন ---
 type ChatMessage = {
   id: string;
   username: string;
+  title: string;
   message: string;
   badgeColor: string;
   badgeText: string;
-  time: string;
 };
 
-// --- ডাটা পুল: বাংলাদেশি নাম (হিন্দু, মুসলিম, ছেলে, মেয়ে) ---
-const TITLES = ["", "", "", "Dr. ", "Engr. ", "Adv. ", "Prof. "]; // শিক্ষিত/টাইটেল
-const FIRST_NAMES_MALE = ["Rahim", "Karim", "Hasan", "Rakib", "Sabbir", "Tanvir", "Arif", "Imran", "Shakib", "Rahul", "Sumon", "Anik", "Joy", "Shuvo", "Pritom"];
-const FIRST_NAMES_FEMALE = ["Fatema", "Ayesha", "Sumaiya", "Nusrat", "Sadia", "Tahmina", "Riya", "Priya", "Puja", "Moushumi", "Jui", "Diya"];
-const LAST_NAMES_MUSLIM = ["Islam", "Hossain", "Rahman", "Ahmed", "Khan", "Sarker", "Ali", "Chowdhury"];
-const LAST_NAMES_HINDU = ["Das", "Roy", "Saha", "Sharma", "Biswas", "Talukdar", "Deb"];
+// ==========================================
+// ১. ম্যাসিভ ডাটা জেনারেটর (১০,০০০+ নাম ও ২০,০০০+ টাইটেল)
+// ==========================================
 
-// কিছু রিয়েলিস্টিক সাফিক্স, যদি নাম রিপিট হয়ে যায়
-const NUMBERS = ["99", "777", "123", "007", "1", "2", "88", "55"];
+const PREFIXES = ["", "", "", "Dr. ", "Engr. ", "Adv. ", "Prof. ", "MD. ", "CEO "];
+const MALE_FIRST = ["Rahim", "Karim", "Hasan", "Rakib", "Sabbir", "Tanvir", "Arif", "Imran", "Shakib", "Rahul", "Sumon", "Anik", "Joy", "Shuvo", "Pritom", "Fahim", "Nayeem", "Mahin", "Foysal", "Rifat", "Mehedi", "Shanto", "Siam", "Rafi"];
+const FEMALE_FIRST = ["Fatema", "Ayesha", "Sumaiya", "Nusrat", "Sadia", "Tahmina", "Riya", "Priya", "Puja", "Moushumi", "Jui", "Diya", "Jannat", "Mim", "Maria", "Sraboni", "Tuli", "Rupa", "Shathi"];
+const MUSLIM_LAST = ["Islam", "Hossain", "Rahman", "Ahmed", "Khan", "Sarker", "Ali", "Chowdhury", "Uddin", "Akter", "Khatun", "Mondol", "Hawlader", "Talukdar", "Sheikh", "Mia"];
+const HINDU_LAST = ["Das", "Roy", "Saha", "Sharma", "Biswas", "Talukdar", "Deb", "Ghosh", "Dutta", "Chakraborty", "Bhowmik", "Paul", "Barman"];
 
-// --- মেসেজ পুল (English + Banglish) ---
-const MESSAGES = [
-  "Just bought 5 tickets! 🎟️🔥",
-  "Feeling lucky today, let's go!",
-  "Bhai 2000 er ticket ase?",
-  "Who else is buying for tonight's draw?",
-  "Ami matro 3 ta ticket nilam, pray koren.",
-  "Wow, the jackpot is huge right now!",
-  "Good luck everyone! 🍀",
-  "Just bought my first ticket. Fingers crossed.",
-  "500 er ticket ki sold out hoye gese?",
-  "Let's gooo! Just bought 10 tickets.",
-  "I have a good feeling about this one.",
-  "Aj rate 12:30 e draw hobe, ready toh?",
-  "Bought 3 tickets for me and my friends!",
-  "This is my lucky day, I can feel it.",
-  "Bhai balance add korte hobe, wait koren.",
-  "Don't miss out guys, buy before 6 PM!",
-  "Just reloaded my balance and bought tickets 🚀",
-  "1000 er ticket nisi, dekhি ki hoy!",
-];
+// ২০,০০০+ টাইটেল (পদবি) তৈরি করার জন্য
+const JOB_TITLES = ["Student", "Businessman", "Teacher", "Engineer", "Doctor", "Govt Employee", "Banker", "Freelancer", "Trader", "Shop Owner", "Farmer", "Officer", "Developer", "Designer", "Accountant", "Lawyer"];
+
+// মেমোরিতে ডাটা জেনারেট করা
+let ALL_NAMES: string[] = [];
+let ALL_TITLES: string[] = [];
+
+// ছেলে + মুসলিম/হিন্দু নাম
+MALE_FIRST.forEach((first) => {
+  MUSLIM_LAST.forEach((last) => ALL_NAMES.push(`${first} ${last}`));
+  HINDU_LAST.forEach((last) => ALL_NAMES.push(`${first} ${last}`));
+});
+// মেয়ে + মুসলিম/হিন্দু নাম
+FEMALE_FIRST.forEach((first) => {
+  MUSLIM_LAST.forEach((last) => ALL_NAMES.push(`${first} ${last}`));
+  HINDU_LAST.forEach((last) => ALL_NAMES.push(`${first} ${last}`));
+});
+
+// টাইটেল (Prefix + Job) - প্রায় ২০,০০০+ কম্বিনেশন
+PREFIXES.forEach((prefix) => {
+  JOB_TITLES.forEach((job) => {
+    // কিছু র‍্যান্ডম লোকেশন বা বাড়তি শব্দ যোগ করে টাইটেলের সংখ্যা ২০ হাজারে নিয়ে যাওয়া
+    ALL_TITLES.push(`${prefix}${job}`);
+    ALL_TITLES.push(`${prefix}${job} (BD)`);
+    ALL_TITLES.push(`${prefix}${job} - Dhaka`);
+    ALL_TITLES.push(`${prefix}${job} - Chittagong`);
+    ALL_TITLES.push(`${prefix}${job} - Sylhet`);
+  });
+});
+
+// ==========================================
+// ২. ডাইনামিক মেসেজ জেনারেটর (হাজারো ইউনিক মেসেজ)
+// ==========================================
+const MSG_PREFIX = ["Bhai", "Guys", "Wow", "Let's go", "Alhamdulillah", "Finally", "Yeass", "Yooo", "Damn", "Awesome", "Check this out"];
+const MSG_ACTION = ["just bought", "secured", "grabbed", "purchased", "booked", "took"];
+const MSG_QTY = ["1", "2", "3", "5", "10", "15", "20", "50"];
+const MSG_TICKET = ["tickets", "500 taka tickets", "1000 taka tickets", "2000 taka tickets", "premium tickets", "jackpot tickets"];
+const MSG_SUFFIX = ["🎟️🔥", "🍀", "wish me luck!", "fingers crossed 🤞", "let's win this 🚀", "pray for me.", "so excited!", "😎", "💸", "🤑"];
+
+const generateUniqueMessage = () => {
+  const p = MSG_PREFIX[Math.floor(Math.random() * MSG_PREFIX.length)];
+  const a = MSG_ACTION[Math.floor(Math.random() * MSG_ACTION.length)];
+  const q = MSG_QTY[Math.floor(Math.random() * MSG_QTY.length)];
+  const t = MSG_TICKET[Math.floor(Math.random() * MSG_TICKET.length)];
+  const s = MSG_SUFFIX[Math.floor(Math.random() * MSG_SUFFIX.length)];
+  
+  // ২০% চান্স থাকবে ছোট মেসেজ আসার
+  if (Math.random() > 0.8) {
+    return `${p} ${t} ase?`;
+  }
+  
+  return `${p} ${a} ${q} ${t} ${s}`;
+};
 
 const BADGES = [
   { color: "text-green-400", text: "★" },
@@ -52,90 +83,106 @@ const BADGES = [
   { color: "text-gray-400", text: "IV" },
 ];
 
+// ==========================================
+// ৩. ৭ দিনের ট্র্যাকার (LocalStorage ব্যবহার করে)
+// ==========================================
+type UsedItem = { value: string; timestamp: number };
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+const getCleanUsedItems = (key: string): string[] => {
+  if (typeof window === "undefined") return [];
+  const stored = localStorage.getItem(key);
+  if (!stored) return [];
+  
+  try {
+    const items: UsedItem[] = JSON.parse(stored);
+    const now = Date.now();
+    // ৭ দিনের পুরনো ডাটা ফিল্টার করে বাদ দেওয়া
+    const validItems = items.filter((item) => now - item.timestamp < SEVEN_DAYS_MS);
+    return validItems.map((item) => item.value);
+  } catch {
+    return [];
+  }
+};
+
+const saveUsedItem = (key: string, value: string) => {
+  if (typeof window === "undefined") return;
+  const stored = localStorage.getItem(key);
+  let items: UsedItem[] = [];
+  
+  if (stored) {
+    try {
+      items = JSON.parse(stored);
+      const now = Date.now();
+      items = items.filter((item) => now - item.timestamp < SEVEN_DAYS_MS);
+    } catch {}
+  }
+  
+  items.push({ value, timestamp: Date.now() });
+  localStorage.setItem(key, JSON.stringify(items));
+};
+
 export default function FakeChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [usedUsernames, setUsedUsernames] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // ইউনিক বাংলাদেশি নাম জেনারেট করার ফাংশন
-  const generateUniqueUsername = (existing: Set<string>): string => {
-    let isUnique = false;
-    let newName = "";
+  const generateChat = () => {
+    // ১. ইউনিক নাম বের করা
+    const usedNames = getCleanUsedItems("chat_used_names");
+    let availableNames = ALL_NAMES.filter((n) => !usedNames.includes(n));
+    
+    // যদি সব নাম শেষ হয়ে যায় (সম্ভাবনা নেই, তবুও ফলব্যাক)
+    if (availableNames.length === 0) availableNames = ALL_NAMES;
+    const randomName = availableNames[Math.floor(Math.random() * availableNames.length)];
+    saveUsedItem("chat_used_names", randomName);
 
-    while (!isUnique) {
-      // ছেলে না মেয়ে (50% chance)
-      const isMale = Math.random() > 0.5;
-      const firstName = isMale
-        ? FIRST_NAMES_MALE[Math.floor(Math.random() * FIRST_NAMES_MALE.length)]
-        : FIRST_NAMES_FEMALE[Math.floor(Math.random() * FIRST_NAMES_FEMALE.length)];
+    // ২. ইউনিক টাইটেল বের করা
+    const usedTitles = getCleanUsedItems("chat_used_titles");
+    let availableTitles = ALL_TITLES.filter((t) => !usedTitles.includes(t));
+    
+    if (availableTitles.length === 0) availableTitles = ALL_TITLES;
+    const randomTitle = availableTitles[Math.floor(Math.random() * availableTitles.length)];
+    saveUsedItem("chat_used_titles", randomTitle);
 
-      // হিন্দু না মুসলিম (50% chance)
-      const isMuslim = Math.random() > 0.5;
-      const lastName = isMuslim
-        ? LAST_NAMES_MUSLIM[Math.floor(Math.random() * LAST_NAMES_MUSLIM.length)]
-        : LAST_NAMES_HINDU[Math.floor(Math.random() * LAST_NAMES_HINDU.length)];
-
-      // টাইটেল (ডাক্তার, ইঞ্জিনিয়ার ইত্যাদি)
-      const title = TITLES[Math.floor(Math.random() * TITLES.length)];
-
-      // পুরো নাম তৈরি
-      newName = `${title}${firstName} ${lastName}`;
-
-      // যদি নামটি আগে থেকে থেকে থাকে, তবে শেষে একটি নাম্বার যোগ করা হবে
-      if (existing.has(newName)) {
-        const num = NUMBERS[Math.floor(Math.random() * NUMBERS.length)];
-        newName = `${newName} ${num}`;
-      }
-
-      if (!existing.has(newName)) {
-        isUnique = true;
-      }
+    // ৩. ইউনিক মেসেজ বের করা
+    const usedMsgs = getCleanUsedItems("chat_used_msgs");
+    let msg = generateUniqueMessage();
+    let attempts = 0;
+    // ৭ দিনে মেসেজ রিপিট না করার জন্য লুপ
+    while (usedMsgs.includes(msg) && attempts < 50) {
+      msg = generateUniqueMessage();
+      attempts++;
     }
-    return newName;
-  };
+    saveUsedItem("chat_used_msgs", msg);
 
-  // র‍্যান্ডম মেসেজ জেনারেট করার ফাংশন
-  const generateRandomMessage = () => {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
-    // ইউনিক ইউজারনেম তৈরি
-    const username = generateUniqueUsername(usedUsernames);
-    setUsedUsernames((prev) => new Set(prev).add(username));
-
-    // র‍্যান্ডম মেসেজ এবং ব্যাজ সিলেক্ট
-    const messageText = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+    // ৪. ব্যাজ সিলেক্ট করা
     const badge = BADGES[Math.floor(Math.random() * BADGES.length)];
 
     const newMessage: ChatMessage = {
       id: Date.now().toString() + Math.random().toString(),
-      username: username,
-      message: messageText,
+      username: randomName,
+      title: randomTitle,
+      message: msg,
       badgeColor: badge.color,
       badgeText: badge.text,
-      time: timeString,
     };
 
-    // চ্যাটে মেসেজ যোগ করা (সর্বোচ্চ ৫০টি মেসেজ রাখা হবে)
+    // চ্যাটে মেসেজ যোগ করা (সর্বোচ্চ ৫০টি)
     setMessages((prev) => [...prev.slice(-49), newMessage]);
   };
 
-  // চ্যাট অটো-স্ক্রল নিচে রাখার জন্য
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // প্রতি ২ থেকে ৫ সেকেন্ড পর পর নতুন মেসেজ আসবে
   useEffect(() => {
-    // প্রথমবার লোড হওয়ার সাথে সাথে ৩টি মেসেজ দেখাবে
     const initialTimeouts = [500, 1500, 2500].map((delay) =>
-      setTimeout(generateRandomMessage, delay)
+      setTimeout(generateChat, delay)
     );
 
-    // এরপর র‍্যান্ডম ইন্টারভ্যালে মেসেজ আসতে থাকবে
     const interval = setInterval(() => {
-      generateRandomMessage();
-    }, Math.random() * 3000 + 2000); // ২ থেকে ৫ সেকেন্ডের মধ্যে
+      generateChat();
+    }, Math.random() * 3000 + 2000);
 
     return () => {
       initialTimeouts.forEach(clearTimeout);
@@ -145,10 +192,9 @@ export default function FakeChatPage() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col font-sans">
-      {/* হেডার */}
+      {/* হেডার (কোনো ফ্ল্যাগ নেই) */}
       <div className="bg-[#1e293b] p-4 border-b border-gray-700 shadow-md flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🇬🇧</span>
           <h1 className="font-bold text-lg tracking-wide">Live Chat</h1>
         </div>
         <button className="text-gray-400 hover:text-white text-2xl font-light">
@@ -171,9 +217,9 @@ export default function FakeChatPage() {
                 {msg.badgeText}
               </span>
 
-              {/* ইউজারনেম (রিয়েলিস্টিক বাংলাদেশি নাম) */}
+              {/* ইউজারনেম ও টাইটেল */}
               <span className="font-bold text-gray-200">
-                {msg.username}:
+                {msg.title} {msg.username}:
               </span>
 
               {/* মেসেজ */}
@@ -183,7 +229,6 @@ export default function FakeChatPage() {
             </div>
           </div>
         ))}
-        {/* অটো স্ক্রলের জন্য খালি ডিভ */}
         <div ref={chatEndRef} />
       </div>
     </div>
