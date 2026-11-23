@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -327,7 +326,8 @@ export default function JackpotHomePage() {
                       </p>
                     </div>
 
-                    <div className="text-right">
+                    {/* TICKETS SOLD Section - Hidden as requested */}
+                    <div className="text-right hidden">
                       <p className="text-[11px] text-gray-400">
                         TICKETS SOLD
                       </p>
