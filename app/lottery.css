@@ -1,3 +1,4 @@
+
 /* =========================================
    Main Layout
    ========================================= */
@@ -84,7 +85,7 @@
 
 .jackpot-title {
   font-size: 10px;
-  color: #f5b041;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 2px;
   font-weight: 800;
@@ -152,7 +153,7 @@
 }
 
 .jackpot-dot.active {
-  background: #f5b041;
+  background: #184f35;
   width: 16px;
   border-radius: 4px;
 }
@@ -224,14 +225,10 @@
   font-style: italic;
 }
 
-.lotto-card-title.orange {
-  color: #f5b041;
-  text-shadow: 0 0 10px rgba(245, 176, 65, 0.3);
-}
-
+.lotto-card-title.orange,
 .lotto-card-title.green {
-  color: #00e701;
-  text-shadow: 0 0 10px rgba(0, 231, 1, 0.3);
+  color: #ffffff;
+  text-shadow: none;
 }
 
 .lotto-card-date {
@@ -276,14 +273,14 @@
 }
 
 .lotto-btn.primary {
-  background: linear-gradient(to right, #184f35, #1f6343);
-  border: 1px solid #2e9b4a;
+  background: #184f35;
+  border: 1px solid #184f35;
   color: #ffffff;
-  box-shadow: 0 4px 15px rgba(46, 155, 74, 0.3);
+  box-shadow: 0 4px 15px rgba(24, 79, 53, 0.3);
 }
 
 .lotto-btn.primary:hover {
-  box-shadow: 0 6px 20px rgba(46, 155, 74, 0.5);
+  box-shadow: 0 6px 20px rgba(24, 79, 53, 0.5);
   transform: translateY(-1px);
 }
 
