@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -39,7 +40,6 @@ export default function LotteryHomePage() {
   const [activeJackpot, setActiveJackpot] = useState(0);
 
   // Fetch Session, Profile and Available Draws
-  // Existing Lottery data source and authentication logic are preserved.
   useEffect(() => {
     let isMounted = true;
 
@@ -106,7 +106,7 @@ export default function LotteryHomePage() {
     };
   }, []);
 
-  // Existing Jackpot banner slider logic is preserved.
+  // Existing Jackpot banner slider logic
   useEffect(() => {
     const sliderInterval = setInterval(() => {
       setActiveJackpot(
@@ -133,7 +133,7 @@ export default function LotteryHomePage() {
     setCurrentDate(formattedDate);
   }, []);
 
-  // Existing daily countdown logic is preserved.
+  // Existing daily countdown logic
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date();
@@ -241,7 +241,7 @@ export default function LotteryHomePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#071510] flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-[#d6a94d] border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#184f35] border-t-transparent rounded-full animate-spin" />
         <p className="text-white mt-4 text-xs font-bold tracking-widest">
           LOADING LOTTERY...
         </p>
@@ -258,13 +258,13 @@ export default function LotteryHomePage() {
       />
 
       <main className="max-w-5xl mx-auto px-3 pt-5">
-        {/* Main Banner - Jackpot page visual style */}
-        <section className="relative overflow-hidden rounded-2xl border border-[#b58b43]/40 bg-gradient-to-br from-[#183b2c] via-[#10291f] to-[#071510] p-5 mb-6">
-          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-[#d6a94d]/10 blur-3xl" />
-          <div className="absolute -left-12 -bottom-16 w-40 h-40 rounded-full bg-[#d6a94d]/10 blur-3xl" />
+        {/* Main Banner */}
+        <section className="relative overflow-hidden rounded-2xl border border-[#184f35]/40 bg-gradient-to-br from-[#183b2c] via-[#10291f] to-[#071510] p-5 mb-6">
+          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-[#184f35]/10 blur-3xl" />
+          <div className="absolute -left-12 -bottom-16 w-40 h-40 rounded-full bg-[#184f35]/10 blur-3xl" />
 
           <div className="relative z-10 text-center">
-            <div className="text-[#e9c477] text-xs font-bold tracking-[4px] mb-3">
+            <div className="text-white text-xs font-bold tracking-[4px] mb-3">
               DAILY GRAND DRAW
             </div>
 
@@ -276,14 +276,14 @@ export default function LotteryHomePage() {
               Choose your ticket and join the next exciting draw.
             </p>
 
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#d6a94d]/40 bg-black/20 px-4 py-2">
-              <span className="w-2 h-2 rounded-full bg-[#d6a94d] animate-pulse" />
-              <span className="text-[#f2d28c] text-xs font-bold">
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#184f35]/40 bg-black/20 px-4 py-2">
+              <span className="w-2 h-2 rounded-full bg-[#184f35] animate-pulse" />
+              <span className="text-white text-xs font-bold">
                 TODAY'S JACKPOT
               </span>
             </div>
 
-            <div className="mt-4 text-3xl sm:text-4xl font-black text-[#f2d28c] tabular-nums">
+            <div className="mt-4 text-3xl sm:text-4xl font-black text-white tabular-nums">
               ৳{formatMoney(jackpotAmounts[activeJackpot])}
             </div>
 
@@ -316,7 +316,7 @@ export default function LotteryHomePage() {
                   onClick={() => setActiveJackpot(index)}
                   className={`h-2 rounded-full transition-all ${
                     activeJackpot === index
-                      ? "w-6 bg-[#e9c477]"
+                      ? "w-6 bg-[#184f35]"
                       : "w-2 bg-white/40"
                   }`}
                 />
@@ -336,12 +336,12 @@ export default function LotteryHomePage() {
             </p>
           </div>
 
-          <span className="text-[#e9c477] text-xs font-bold">
+          <span className="text-white text-xs font-bold">
             DAILY
           </span>
         </div>
 
-        {/* Existing Lottery Error Message */}
+        {/* Lottery Error Message */}
         {drawError && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-4 mb-4">
             <p className="text-red-300 text-sm text-center">
@@ -350,10 +350,10 @@ export default function LotteryHomePage() {
           </div>
         )}
 
-        {/* Existing Lottery Draw Cards - Jackpot visual style */}
+        {/* Lottery Draw Cards */}
         <div className="grid grid-cols-1 gap-4">
           {!drawError && draws.length === 0 && (
-            <section className="rounded-2xl border border-[#b58b43]/30 bg-[#10231b] p-5 text-center shadow-lg">
+            <section className="rounded-2xl border border-[#184f35]/30 bg-[#10231b] p-5 text-center shadow-lg">
               <p className="text-gray-300 text-sm">
                 No lottery draws are currently available.
               </p>
@@ -373,26 +373,20 @@ export default function LotteryHomePage() {
             return (
               <section
                 key={draw.id}
-                className="relative overflow-hidden rounded-2xl border border-[#b58b43]/35 bg-[#10231b] shadow-lg"
+                className="relative overflow-hidden rounded-2xl border border-[#184f35]/35 bg-[#10231b] shadow-lg"
               >
-                <div className="absolute -right-10 -top-12 w-40 h-40 rounded-full bg-[#d6a94d]/10 blur-3xl" />
+                <div className="absolute -right-10 -top-12 w-40 h-40 rounded-full bg-[#184f35]/10 blur-3xl" />
 
                 <div className="relative z-10 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-extrabold tracking-[2px] text-[#e9c477]">
+                      <div className="text-xs font-extrabold tracking-[2px] text-white">
                         LOTTERY CATEGORY
                       </div>
 
                       <h3 className="text-2xl font-black mt-1">
                         {tier.title}{" "}
-                        <span
-                          className={
-                            tier.color === "orange"
-                              ? "text-[#e5a83b]"
-                              : "text-[#7dd3a7]"
-                          }
-                        >
+                        <span className="text-white">
                           {tier.titleSpan}
                         </span>
                       </h3>
@@ -402,7 +396,7 @@ export default function LotteryHomePage() {
                       </p>
                     </div>
 
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-[#d6a94d] text-xl font-black text-[#f2d28c] bg-[#d6a94d]/10">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-[#184f35] text-xl font-black text-white bg-[#184f35]/10">
                       ৳
                     </div>
                   </div>
@@ -412,7 +406,7 @@ export default function LotteryHomePage() {
                       TOTAL PRIZE
                     </p>
 
-                    <div className="text-2xl sm:text-3xl font-black mt-1 text-[#f2d28c]">
+                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white">
                       ৳{formatMoney(prize)}
                     </div>
                   </div>
@@ -444,7 +438,7 @@ export default function LotteryHomePage() {
                       </p>
                       <p
                         className={`text-xs font-bold mt-1 ${
-                          isOpen ? "text-green-400" : "text-yellow-300"
+                          isOpen ? "text-[#184f35]" : "text-white"
                         }`}
                       >
                         {getStatus(draw.status)}
@@ -488,16 +482,16 @@ export default function LotteryHomePage() {
                     </div>
                   </div>
 
-                  {/* Existing Draw History navigation is preserved. */}
+                  {/* Draw History */}
                   <button
                     type="button"
                     onClick={() => router.push("/Winner-selection/")}
-                    className="w-full mt-4 rounded-xl border border-[#d6a94d]/50 bg-black/20 py-3 text-[#f2d28c] font-extrabold text-sm transition active:scale-[0.98]"
+                    className="w-full mt-4 rounded-xl border border-[#184f35]/50 bg-black/20 py-3 text-white font-extrabold text-sm transition active:scale-[0.98]"
                   >
                     DRAW HISTORY
                   </button>
 
-                  {/* Existing Login and Ticket Purchase navigation is preserved. */}
+                  {/* Ticket Purchase */}
                   <button
                     type="button"
                     disabled={!isOpen}
@@ -523,7 +517,7 @@ export default function LotteryHomePage() {
                         )}`
                       );
                     }}
-                    className="w-full mt-2 rounded-xl bg-[#d6a94d] text-[#071510] py-3 font-extrabold text-sm transition active:scale-[0.98]"
+                    className="w-full mt-2 rounded-xl bg-[#184f35] text-white py-3 font-extrabold text-sm transition active:scale-[0.98]"
                   >
                     {isOpen
                       ? `BUY TICKET ৳${formatMoney(Number(draw.ticket_price))}`
@@ -535,9 +529,9 @@ export default function LotteryHomePage() {
           })}
         </div>
 
-        {/* Information section styled like Jackpot page */}
+        {/* Information Section */}
         <section className="mt-6 rounded-xl border border-white/10 bg-[#10231b] p-4">
-          <h3 className="text-sm font-bold text-[#e9c477]">
+          <h3 className="text-sm font-bold text-white">
             HOW LOTTERY WORKS
           </h3>
 
