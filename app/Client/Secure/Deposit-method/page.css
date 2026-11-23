@@ -9,6 +9,7 @@
   --btn-green: #184f35;
 
   background-color: var(--bg-main);
+  min-height: 100dvh;
   height: 100dvh;
   width: 100%;
   font-family: inherit;
@@ -27,6 +28,7 @@
 
 .secure-main {
   flex: 1;
+  min-height: 0;
   padding: 12px 16px;
   max-width: 600px;
   margin: 0 auto;
@@ -40,32 +42,22 @@
   scrollbar-color: var(--border-color) transparent;
 }
 
-.deposit-page-heading {
-  padding: 4px 0;
-}
+/* Loading */
 
-.deposit-page-heading h1 {
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.deposit-page-heading p {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 4px 0 0;
-}
-
-.deposit-loading {
+.deposit-loading-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
 }
 
-.deposit-loading p {
+.deposit-loading-content p {
   color: var(--text-muted);
   font-size: 13px;
+  margin: 0;
 }
 
 .deposit-loader {
@@ -81,31 +73,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-/* Balance Card */
-
-.balance-info-card {
-  background: linear-gradient(135deg, #1f1b33 0%, #121016 100%);
-  border: 1px solid var(--white);
-  border-radius: 12px;
-  padding: 12px;
-  text-align: center;
-  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.05);
-}
-
-.balance-info-card span {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.balance-info-card h2 {
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--white);
-  margin: 4px 0 0;
 }
 
 /* Sections */
@@ -125,34 +92,37 @@
 
 .payment-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .payment-option {
   position: relative;
   min-width: 0;
+  min-height: 82px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 12px 10px;
+  padding: 10px 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 7px;
   cursor: pointer;
   transition: all 0.2s;
-  text-align: left;
+  text-align: center;
   color: var(--text-main);
 }
 
 .payment-option.active {
-  border-color: var(--white);
+  border-color: #0d241e;
   background: rgba(255, 255, 255, 0.05);
 }
 
 .payment-option img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -161,11 +131,12 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--text-main);
+  overflow-wrap: anywhere;
 }
 
 .payment-fallback {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -178,8 +149,10 @@
 }
 
 .payment-check {
-  margin-left: auto;
-  font-size: 14px;
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  font-size: 12px;
   font-weight: 900;
   color: var(--white);
 }
@@ -188,7 +161,7 @@
 
 .instruction-box {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px dashed var(--white);
+  border: 1px dashed #0d241e;
   border-radius: 8px;
   padding: 12px;
 }
@@ -210,7 +183,7 @@
   justify-content: space-between;
   gap: 8px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #0d241e;
   border-radius: 6px;
   padding: 8px 10px;
   margin-top: 8px;
@@ -243,6 +216,72 @@
   margin-top: 8px !important;
 }
 
+/* Deposit Form Card */
+
+.deposit-form-card {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid #0d241e;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.deposit-form-field {
+  width: 100%;
+}
+
+.deposit-form-field .sec-title {
+  margin-bottom: 5px;
+}
+
+.deposit-limit {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+
+.deposit-limit span {
+  padding: 0 4px;
+}
+
+/* Quick Amount Buttons */
+
+.quick-amount-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: var(--bg-main);
+}
+
+.quick-amount-btn {
+  min-width: 0;
+  padding: 10px 2px;
+  background: var(--bg-main);
+  border: none;
+  border-radius: 0;
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quick-amount-btn + .quick-amount-btn {
+  border-left: none;
+}
+
+.quick-amount-btn.active {
+  background: var(--btn-green);
+  color: var(--white);
+}
+
 /* Inputs */
 
 .custom-amount-input,
@@ -271,19 +310,13 @@
 
 .custom-amount-input:focus,
 .trx-input:focus {
-  border-color: var(--white);
+  border-color: #0d241e;
 }
 
 .custom-amount-input::placeholder,
 .trx-input::placeholder {
   color: var(--text-muted);
   opacity: 0.8;
-}
-
-.deposit-limit {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin: 6px 2px 0;
 }
 
 /* Messages */
@@ -323,7 +356,7 @@
 
 .deposit-tracking-box {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--white);
+  border: 1px solid #0d241e;
   border-radius: 8px;
   padding: 12px;
   text-align: center;
@@ -373,7 +406,7 @@
   margin: 0 auto;
   padding: 14px;
   background: var(--btn-green);
-  border: 1px solid var(--white);
+  border: 1px solid #0d241e;
   border-radius: 8px;
   color: var(--white);
   font-size: 14px;
@@ -388,6 +421,29 @@
   cursor: not-allowed;
   background: var(--border-color);
   border-color: var(--border-color);
+}
+
+@media (max-width: 360px) {
+  .secure-main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .payment-grid {
+    gap: 6px;
+  }
+
+  .payment-option {
+    min-height: 76px;
+  }
+
+  .quick-amount-btn {
+    font-size: 10px;
+  }
+
+  .deposit-form-card {
+    padding: 12px;
+  }
 }
 
 @media (min-width: 601px) {
