@@ -242,7 +242,7 @@ export default function LotteryHomePage() {
     return (
       <div className="min-h-screen bg-[#071510] flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-[#184f35] border-t-transparent rounded-full animate-spin" />
-        <p className="text-white mt-4 text-xs font-bold tracking-widest">
+        <p className="text-white mt-4 text-[12px] font-bold tracking-widest">
           LOADING LOTTERY...
         </p>
       </div>
@@ -264,26 +264,26 @@ export default function LotteryHomePage() {
           <div className="absolute -left-12 -bottom-16 w-40 h-40 rounded-full bg-[#184f35]/10 blur-3xl" />
 
           <div className="relative z-10 text-center">
-            <div className="text-white text-xs font-bold tracking-[4px] mb-3">
+            <div className="text-white text-[12px] font-bold tracking-[4px] mb-3">
               DAILY GRAND DRAW
             </div>
 
-            <h1 className="text-3xl sm:text-4xl font-black tracking-wide">
+            <h1 className="text-[19px] font-black tracking-wide">
               LOTTERY
             </h1>
 
-            <p className="text-[#c6d6cc] text-sm mt-2">
+            <p className="text-[#c6d6cc] text-[14px] mt-2">
               Choose your ticket and join the next exciting draw.
             </p>
 
             <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#184f35]/40 bg-black/20 px-4 py-2">
               <span className="w-2 h-2 rounded-full bg-[#184f35] animate-pulse" />
-              <span className="text-white text-xs font-bold">
+              <span className="text-white text-[12px] font-bold">
                 TODAY'S JACKPOT
               </span>
             </div>
 
-            <div className="mt-4 text-3xl sm:text-4xl font-black text-white tabular-nums">
+            <div className="mt-4 text-[19px] font-black text-white tabular-nums">
               ৳{formatMoney(jackpotAmounts[activeJackpot])}
             </div>
 
@@ -297,7 +297,7 @@ export default function LotteryHomePage() {
                   key={label}
                   className="rounded-lg bg-black/35 border border-white/10 py-2 text-center"
                 >
-                  <div className="text-xl font-black tabular-nums">
+                  <div className="text-[17px] font-black tabular-nums">
                     {value}
                   </div>
                   <div className="text-[9px] text-gray-400 font-bold">
@@ -328,15 +328,15 @@ export default function LotteryHomePage() {
         {/* Lottery Heading */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-extrabold">
+            <h2 className="text-[17px] font-extrabold">
               Available Lottery Draws
             </h2>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-[12px] text-gray-400 mt-1">
               Select a draw to view details or buy tickets
             </p>
           </div>
 
-          <span className="text-white text-xs font-bold">
+          <span className="text-white text-[12px] font-bold">
             DAILY
           </span>
         </div>
@@ -344,7 +344,7 @@ export default function LotteryHomePage() {
         {/* Lottery Error Message */}
         {drawError && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/30 p-4 mb-4">
-            <p className="text-red-300 text-sm text-center">
+            <p className="text-red-300 text-[14px] text-center">
               {drawError}
             </p>
           </div>
@@ -354,7 +354,7 @@ export default function LotteryHomePage() {
         <div className="grid grid-cols-1 gap-4">
           {!drawError && draws.length === 0 && (
             <section className="rounded-2xl border border-[#184f35]/30 bg-[#10231b] p-5 text-center shadow-lg">
-              <p className="text-gray-300 text-sm">
+              <p className="text-gray-300 text-[14px]">
                 No lottery draws are currently available.
               </p>
             </section>
@@ -380,33 +380,33 @@ export default function LotteryHomePage() {
                 <div className="relative z-10 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-extrabold tracking-[2px] text-white">
+                      <div className="text-[12px] font-extrabold tracking-[2px] text-white">
                         LOTTERY CATEGORY
                       </div>
 
-                      <h3 className="text-2xl font-black mt-1">
+                      <h3 className="text-[19px] font-black mt-1">
                         {tier.title}{" "}
                         <span className="text-white">
                           {tier.titleSpan}
                         </span>
                       </h3>
 
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-[12px] text-gray-400 mt-1">
                         Draw Date: {formatDrawDate(draw.draw_date)}
                       </p>
                     </div>
 
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-[#184f35] text-xl font-black text-white bg-[#184f35]/10">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-[#184f35] text-[17px] font-black text-white bg-[#184f35]/10">
                       ৳
                     </div>
                   </div>
 
                   <div className="mt-4 rounded-xl bg-black/25 p-4">
-                    <p className="text-xs text-gray-400 font-semibold">
+                    <p className="text-[12px] text-gray-400 font-semibold">
                       TOTAL PRIZE
                     </p>
 
-                    <div className="text-2xl sm:text-3xl font-black mt-1 text-white">
+                    <div className="text-[19px] font-black mt-1 text-white">
                       ৳{formatMoney(prize)}
                     </div>
                   </div>
@@ -416,7 +416,7 @@ export default function LotteryHomePage() {
                       <p className="text-[11px] text-gray-400">
                         TICKET PRICE
                       </p>
-                      <p className="text-sm font-bold mt-1">
+                      <p className="text-[14px] font-bold mt-1">
                         ৳{formatMoney(Number(draw.ticket_price))}
                       </p>
                     </div>
@@ -425,7 +425,7 @@ export default function LotteryHomePage() {
                       <p className="text-[11px] text-gray-400">
                         TICKETS SOLD
                       </p>
-                      <p className="text-sm font-bold mt-1">
+                      <p className="text-[14px] font-bold mt-1">
                         {formatMoney(Number(draw.total_tickets_sold || 0))}
                       </p>
                     </div>
@@ -437,7 +437,7 @@ export default function LotteryHomePage() {
                         DRAW STATUS
                       </p>
                       <p
-                        className={`text-xs font-bold mt-1 ${
+                        className={`text-[12px] font-bold mt-1 ${
                           isOpen ? "text-[#184f35]" : "text-white"
                         }`}
                       >
@@ -449,7 +449,7 @@ export default function LotteryHomePage() {
                       <p className="text-[11px] text-gray-400">
                         DRAW DATE
                       </p>
-                      <p className="text-sm font-bold mt-1">
+                      <p className="text-[14px] font-bold mt-1">
                         {formatDrawDate(draw.draw_date)}
                       </p>
                     </div>
@@ -471,7 +471,7 @@ export default function LotteryHomePage() {
                           key={label}
                           className="rounded-lg bg-black/35 border border-white/5 py-2 text-center"
                         >
-                          <div className="text-lg font-black tabular-nums">
+                          <div className="text-[17px] font-black tabular-nums">
                             {value}
                           </div>
                           <div className="text-[9px] text-gray-400 font-bold">
@@ -486,7 +486,7 @@ export default function LotteryHomePage() {
                   <button
                     type="button"
                     onClick={() => router.push("/Winner-selection/")}
-                    className="w-full mt-4 rounded-xl border border-[#184f35]/50 bg-black/20 py-3 text-white font-extrabold text-sm transition active:scale-[0.98]"
+                    className="w-full mt-4 rounded-xl border border-[#184f35]/50 bg-black/20 py-3 text-white font-extrabold text-[14px] transition active:scale-[0.98]"
                   >
                     DRAW HISTORY
                   </button>
@@ -517,7 +517,7 @@ export default function LotteryHomePage() {
                         )}`
                       );
                     }}
-                    className="w-full mt-2 rounded-xl bg-[#184f35] text-white py-3 font-extrabold text-sm transition active:scale-[0.98]"
+                    className="w-full mt-2 rounded-xl bg-[#184f35] text-white py-3 font-extrabold text-[14px] transition active:scale-[0.98]"
                   >
                     {isOpen
                       ? `BUY TICKET ৳${formatMoney(Number(draw.ticket_price))}`
@@ -531,11 +531,11 @@ export default function LotteryHomePage() {
 
         {/* Information Section */}
         <section className="mt-6 rounded-xl border border-white/10 bg-[#10231b] p-4">
-          <h3 className="text-sm font-bold text-white">
+          <h3 className="text-[14px] font-bold text-white">
             HOW LOTTERY WORKS
           </h3>
 
-          <ul className="mt-3 space-y-2 text-xs text-gray-300">
+          <ul className="mt-3 space-y-2 text-[12px] text-gray-300">
             <li>• Choose one of the available Lottery draws.</li>
             <li>• Check the draw date, ticket price and prize amount.</li>
             <li>• Purchase tickets while sales are open.</li>
