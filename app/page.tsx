@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -421,7 +420,8 @@ export default function LotteryHomePage() {
                       </p>
                     </div>
 
-                    <div className="rounded-xl bg-black/25 p-3">
+                    {/* TICKETS SOLD Section - Hidden as requested */}
+                    <div className="rounded-xl bg-black/25 p-3 hidden">
                       <p className="text-[11px] text-gray-400">
                         TICKETS SOLD
                       </p>
