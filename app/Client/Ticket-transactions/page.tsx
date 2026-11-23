@@ -308,7 +308,8 @@ export default function TicketTransactionsPage() {
 
       <main className="mx-auto w-full max-w-[700px] px-3 pb-32 pt-5 sm:px-5">
 
-        <div className="mb-5 flex items-center justify-between gap-3">
+        {/* HIDDEN: Ticket History heading, subtitle and Refresh */}
+        <div className="hidden mb-5 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-white">
               {t("Ticket History", "টিকিটের ইতিহাস")}
@@ -372,7 +373,8 @@ export default function TicketTransactionsPage() {
         {/* LOTTERY TRANSACTIONS */}
         {activeTab === "lottery" && (
           <>
-            <div className="mb-5 rounded-xl border border-[#294438] bg-[#142d23] p-3">
+            {/* HIDDEN: Total Purchased Tickets */}
+            <div className="hidden mb-5 rounded-xl border border-[#294438] bg-[#142d23] p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">
@@ -488,7 +490,8 @@ export default function TicketTransactionsPage() {
                       </span>
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between gap-3">
+                    {/* HIDDEN: Draw Status */}
+                    <div className="hidden mt-2 flex items-center justify-between gap-3">
                       <span className="text-xs text-gray-400">
                         {t("Draw Status", "ড্রয়ের অবস্থা")}
                       </span>
@@ -502,7 +505,8 @@ export default function TicketTransactionsPage() {
                       </span>
                     </div>
 
-                    <div className="mt-3 border-t border-[#304238] pt-3">
+                    {/* HIDDEN: Winner Status and Prize Amount */}
+                    <div className="hidden mt-3 border-t border-[#304238] pt-3">
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-xs text-gray-400">
                           {t("Winner Status", "বিজয়ীর অবস্থা")}
@@ -579,7 +583,8 @@ export default function TicketTransactionsPage() {
         {/* JACKPOT TRANSACTIONS */}
         {activeTab === "jackpot" && (
           <>
-            <div className="mb-5 rounded-xl border border-[#294438] bg-[#142d23] p-3">
+            {/* HIDDEN: Jackpot Tickets on This Page */}
+            <div className="hidden mb-5 rounded-xl border border-[#294438] bg-[#142d23] p-3">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-gray-400">
