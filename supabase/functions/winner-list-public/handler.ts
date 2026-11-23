@@ -50,6 +50,7 @@ async function getEncryptionKey(secret: string) {
 async function createTicketToken(
   ticketId: string,
   serviceKey: string,
+  ticketType: "lottery" | "jackpot" = "lottery",
 ) {
   const key = await getEncryptionKey(serviceKey);
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -58,6 +59,7 @@ async function createTicketToken(
     JSON.stringify({
       v: 1,
       ticket_id: ticketId,
+      ticket_type: ticketType,
     }),
   );
 
@@ -378,6 +380,7 @@ serve(async (req) => {
         const token = await createTicketToken(
           item.winning_ticket_id,
           serviceKey,
+          "jackpot",
         );
 
         jackpotResult.push({
