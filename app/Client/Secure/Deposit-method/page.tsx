@@ -446,7 +446,7 @@ export default function DepositMethodPage() {
                 <input
                   className="trx-input"
                   type="text"
-                  placeholder="Your payment account (optional)"
+                  placeholder="optional"
                   value={senderAccount}
                   onChange={(event) => setSenderAccount(event.target.value)}
                 />
