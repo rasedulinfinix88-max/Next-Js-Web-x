@@ -17,6 +17,7 @@ type PaymentMethod = {
   is_enabled: boolean;
   min_withdrawal: number;
   max_withdrawal: number;
+  logo_url?: string | null;
   withdrawal_instructions?: string;
   maintenance_message?: string;
 };
@@ -717,6 +718,19 @@ export default function WithdrawalPage() {
                         : "hover:border-white/60"
                     }`}
                   >
+                    {method.logo_url && (
+                      <div className="w-full h-12 flex items-center justify-start mb-3">
+                        <img
+                          src={method.logo_url}
+                          alt={`${method.method_name} Logo`}
+                          className="max-h-12 max-w-full object-contain"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+
                     <div className="text-white font-extrabold text-sm">
                       {method.method_name}
                     </div>
