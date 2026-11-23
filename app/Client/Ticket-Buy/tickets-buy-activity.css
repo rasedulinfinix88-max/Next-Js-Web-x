@@ -1,47 +1,83 @@
+
+/* =========================================
+   Ticket Buy Page - Responsive Layout
+   ========================================= */
+
 .ticket-buy-page {
   --bg-main: #0d241e;
-  --bg-card: #1B2A23;
-  --border-color: #2B4236;
-  --text-main: #FFFFFF;
-  --text-muted: #A0ADB0;
-  --gold: #FFFFFF; 
+  --bg-card: #1b2a23;
+  --border-color: #2b4236;
+  --text-main: #ffffff;
+  --text-muted: #a0adb0;
   --btn-green: #184f35;
 
+  /* Common Font Scale */
+  --font-xs: 9px;
+  --font-sm: 10px;
+  --font-base: 11px;
+  --font-md: 12px;
+  --font-normal: 13px;
+  --font-button: 14px;
+  --font-large: 15px;
+  --font-price: 16px;
+  --font-title: 17px;
+  --font-heading: 19px;
+
   background-color: var(--bg-main);
+  color: var(--text-main);
   min-height: 100vh;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: clip;
   font-family: inherit;
-  /* ফুটার এবং ফিক্সড বাটনের জন্য জায়গা রাখা হলো (যাতে কন্টেন্ট ঢেকে না যায়) */
-  padding-bottom: 160px; 
+  padding-bottom: 160px;
 }
 
+.ticket-buy-page *,
+.ticket-buy-page *::before,
+.ticket-buy-page *::after {
+  box-sizing: border-box;
+}
+
+/* =========================================
+   Main Content
+   ========================================= */
+
 .ticket-buy-main {
-  padding: 16px;
+  width: 100%;
   max-width: 600px;
+  min-width: 0;
+  padding: 16px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-sizing: border-box;
 }
 
 /* =========================================
-   1. Premium CSS-Based Ticket Design
+   1. Ticket Preview
    ========================================= */
+
 .ticket-preview-card {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: linear-gradient(135deg, #9b00d3 0%, #6a11cb 100%);
   border-radius: 12px;
   display: flex;
   position: relative;
   overflow: hidden;
-  aspect-ratio: 2 / 1; 
-  box-shadow: 0 10px 25px rgba(106, 17, 203, 0.4);
+  aspect-ratio: 2 / 1;
   min-height: 190px;
   border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 25px rgba(106, 17, 203, 0.4);
 }
 
-.ticket-preview-card::before, 
+.ticket-preview-card::before,
 .ticket-preview-card::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   width: 24px;
@@ -51,12 +87,19 @@
   transform: translateY(-50%);
   z-index: 2;
 }
-.ticket-preview-card::before { left: -12px; }
-.ticket-preview-card::after { right: -12px; }
+
+.ticket-preview-card::before {
+  left: -12px;
+}
+
+.ticket-preview-card::after {
+  right: -12px;
+}
 
 .ticket-left {
-  flex: 1;
-  padding: 20px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: clamp(12px, 4vw, 20px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -65,17 +108,17 @@
 }
 
 .ticket-title {
-  font-size: 26px;
+  font-size: var(--font-heading);
   font-weight: 900;
-  color: #FFFFFF;
+  color: #ffffff;
   margin: 0;
   line-height: 1.1;
   letter-spacing: 1px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .ticket-subtitle {
-  font-size: 10px;
+  font-size: var(--font-sm);
   color: rgba(255, 255, 255, 0.8);
   font-weight: 700;
   margin-top: 4px;
@@ -91,7 +134,7 @@
 }
 
 .pool-label {
-  font-size: 9px;
+  font-size: var(--font-xs);
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -99,26 +142,29 @@
 }
 
 .pool-amount {
-  font-size: 18px;
+  font-size: var(--font-title);
   font-weight: 900;
-  color: #FFD700;
-  text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+  color: #ffffff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
   letter-spacing: 0.5px;
+  overflow-wrap: anywhere;
 }
 
 .ticket-price-tag {
   display: inline-block;
-  background: #FFFFFF; 
-  color: #000;
+  max-width: 100%;
+  background: #ffffff;
+  color: #000000;
   padding: 6px 16px;
   border-radius: 20px;
-  font-size: 16px;
+  font-size: var(--font-price);
   font-weight: 900;
   margin-top: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 .ticket-divider {
+  flex: 0 0 1px;
   width: 1px;
   border-left: 2px dashed rgba(255, 255, 255, 0.3);
   margin: 15px 0;
@@ -126,8 +172,9 @@
 }
 
 .ticket-right {
-  flex: 0.8;
-  padding: 16px;
+  flex: 0 0 30%;
+  min-width: 0;
+  padding: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -136,37 +183,52 @@
 }
 
 .barcode-vertical-wrapper {
-  width: 38px; 
+  width: 38px;
+  max-width: 100%;
   height: 130px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #FFFFFF;
+  background: #ffffff;
   border-radius: 4px;
   padding: 2px;
+  overflow: hidden;
 }
 
 .barcode-vertical-wrapper img {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: fill; 
+  object-fit: fill;
+}
+
+.barcode-vertical-wrapper span {
+  font-size: var(--font-sm);
+  color: #000000;
 }
 
 /* =========================================
-   2. Input Section & Live Counter
+   2. Input Section
    ========================================= */
+
 .input-section {
+  width: 100%;
+  min-width: 0;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 16px;
 }
 
-/* Live Counter Design */
+/* Live Counter */
+
 .live-counter-container {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 16px;
   background: rgba(0, 0, 0, 0.2);
   padding: 10px 12px;
@@ -175,15 +237,18 @@
 }
 
 .live-badge {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--font-base);
   font-weight: 700;
   color: #ffffff;
+  flex-wrap: wrap;
 }
 
 .live-dot {
+  flex: 0 0 8px;
   width: 8px;
   height: 8px;
   background-color: #ff4d4d;
@@ -192,125 +257,160 @@
 }
 
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-  70% { box-shadow: 0 0 0 6px rgba(255, 77, 77, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 77, 77, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 77, 77, 0);
+  }
 }
 
 .sold-badge {
-  font-size: 11px;
+  flex: 0 0 auto;
+  font-size: var(--font-base);
   font-weight: 800;
-  color: #F5B041;
-  background: rgba(245, 176, 65, 0.1);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
   padding: 4px 8px;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
-/* Draw Watching Mode */
+/* Draw Date */
+
 .draw-watching-badge {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--font-md);
   font-weight: 800;
-  color: #F5B041;
-  background: rgba(245, 176, 65, 0.1);
-  padding: 6px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 8px;
   border-radius: 6px;
+  text-align: center;
+  flex-wrap: wrap;
 }
 
 .draw-watching-badge .live-dot {
-  background-color: #F5B041;
-  box-shadow: 0 0 8px rgba(245, 176, 65, 0.8);
+  background-color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
+
+/* Ticket Number */
 
 .ticket-number-input {
   width: 100%;
+  min-width: 0;
   background: var(--bg-main);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 14px 10px;
-  color: #FFFFFF; 
-  font-size: 18px; 
+  color: #ffffff;
+  font-size: var(--font-title);
   font-weight: 800;
   text-align: center;
-  letter-spacing: 3px; 
+  letter-spacing: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   outline: none;
   font-family: monospace;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .ticket-number-input:focus {
-  border-color: #FFFFFF; 
+  border-color: #ffffff;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 .ticket-number-input::placeholder {
   letter-spacing: 1px;
-  font-size: 13px;
+  font-size: var(--font-normal);
   font-family: inherit;
   font-weight: 500;
   color: var(--text-muted);
 }
 
 .helper-text {
-  font-size: 11px;
+  width: 100%;
+  min-width: 0;
+  font-size: var(--font-base);
   color: var(--text-muted);
   margin-top: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
 }
+
+.helper-text strong {
+  color: #ffffff;
+  font-size: var(--font-normal);
+}
+
+/* Action Buttons */
 
 .button-group {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .action-btn {
   background: transparent;
-  color: #FFFFFF; 
-  border: 1px solid #FFFFFF; 
+  color: #ffffff;
+  border: 1px solid #ffffff;
   border-radius: 4px;
   padding: 6px 10px;
-  font-size: 10px;
+  font-size: var(--font-sm);
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.1); 
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* =========================================
-   3. Submit Button (Fixed above Footer)
+   3. Fixed Purchase Button
    ========================================= */
+
 .submit-btn-wrapper {
   position: fixed;
-  /* Footer এর উচ্চতা প্রায় 65px, তাই বাটনটিকে তার উপরে রাখার জন্য 65px দেওয়া হলো */
-  bottom: 65px; 
+  bottom: 65px;
   left: 0;
   width: 100%;
+  box-sizing: border-box;
   padding: 12px 16px;
   background: var(--bg-main);
   border-top: 1px solid var(--border-color);
-  z-index: 40; /* Footer এর z-index (50) থেকে কম দেওয়া হলো যাতে ফুটার সবার উপরে থাকে */
+  z-index: 40;
 }
 
 .buy-ticket-btn {
+  display: block;
   width: 100%;
+  max-width: 568px;
+  margin: 0 auto;
   padding: 14px;
   background: var(--btn-green);
-  border: 1px solid #FFFFFF;
+  border: 1px solid #ffffff;
   border-radius: 8px;
-  color: #FFFFFF;
-  font-size: 14px;
+  color: #ffffff;
+  font-size: var(--font-button);
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
   transition: all 0.2s;
 }
 
@@ -322,50 +422,122 @@
   color: var(--text-muted);
 }
 
-/* Error & Success Messages */
+/* =========================================
+   4. Error & Success
+   ========================================= */
+
 .error-msg {
-  color: #ff4d4d;
-  font-size: 11px;
+  color: #ff7777;
+  font-size: var(--font-base);
   text-align: center;
   margin-top: 10px;
   font-weight: bold;
+  overflow-wrap: anywhere;
 }
 
 .success-msg {
-  color: #00E701;
-  font-size: 11px;
+  color: #ffffff;
+  font-size: var(--font-base);
   text-align: center;
   margin-top: 10px;
   font-weight: bold;
 }
 
-/* Disclaimer Box */
+/* =========================================
+   5. Disclaimer
+   ========================================= */
+
 .disclaimer-box {
+  width: 100%;
+  min-width: 0;
   background: rgba(255, 255, 255, 0.05);
-  border-left: 3px solid #FFFFFF;
+  border-left: 3px solid #ffffff;
   padding: 12px;
   border-radius: 6px;
   margin-top: 16px;
 }
 
 .disclaimer-box p {
-  font-size: 11px;
-  color: #A0ADB0;
+  font-size: var(--font-base);
+  color: var(--text-muted);
   line-height: 1.5;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .disclaimer-box strong {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
-/* Loader Animation */
+/* =========================================
+   6. Loader
+   ========================================= */
+
 .ticket-loader {
+  font-size: 32px;
   animation: ticketSpinPulse 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 @keyframes ticketSpinPulse {
-  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3)); }
-  50% { transform: scale(1.15) rotate(180deg); filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.9)); }
-  100% { transform: scale(1) rotate(360deg); filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3)); }
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+  }
+
+  50% {
+    transform: scale(1.15) rotate(180deg);
+    filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.9));
+  }
+
+  100% {
+    transform: scale(1) rotate(360deg);
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+  }
+}
+
+/* =========================================
+   7. Small Mobile Screens
+   ========================================= */
+
+@media (max-width: 380px) {
+  .ticket-buy-main {
+    padding: 12px;
+  }
+
+  .ticket-preview-card {
+    min-height: 175px;
+  }
+
+  .ticket-left {
+    padding: 12px;
+  }
+
+  .ticket-right {
+    flex-basis: 27%;
+    padding: 6px;
+  }
+
+  .ticket-divider {
+    margin: 12px 0;
+  }
+
+  .ticket-price-tag {
+    padding: 5px 12px;
+  }
+
+  .input-section {
+    padding: 12px;
+  }
+
+  .live-counter-container {
+    padding: 8px;
+  }
+
+  .sold-badge {
+    padding: 4px 6px;
+  }
+
+  .submit-btn-wrapper {
+    padding: 10px 12px;
+  }
 }
