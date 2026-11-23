@@ -14,6 +14,24 @@ const ADMIN_PATH = "/admin-panel-rakib-aiman-tushar";
 type Section = "overview" | "withdrawals" | "methods" | "settings";
 type WithdrawalStatus = "pending" | "approved" | "rejected";
 
+type AccountDetails = {
+  account_holder_name?: string;
+  account_number?: string;
+  bank_name?: string;
+  branch_name?: string;
+  routing_number?: string;
+  account_type?: string;
+  wallet_address?: string;
+  network?: string;
+  [key: string]: any;
+};
+
+type SnapshotRelation = {
+  account_id?: string;
+  payment_method_code?: string;
+  account_snapshot?: AccountDetails;
+};
+
 type Withdrawal = {
   id: string;
   tracking_id: string;
@@ -31,10 +49,7 @@ type Withdrawal = {
     user_mobile?: string;
     lottery_id?: string;
   } | null;
-  withdrawal_account_snapshots?: Array<{
-    payment_method_code?: string;
-    account_snapshot?: Record<string, any>;
-  }>;
+  withdrawal_account_snapshots?: SnapshotRelation[] | SnapshotRelation | null;
 };
 
 type WithdrawalMethod = {
@@ -42,11 +57,26 @@ type WithdrawalMethod = {
   method_code: string;
   method_name: string;
   method_type?: string;
+  logo_url?: string | null;
   is_enabled: boolean;
   min_withdrawal: number;
   max_withdrawal: number;
   withdrawal_instructions?: string | null;
   maintenance_message?: string | null;
+};
+
+type AuditLog = {
+  id: string;
+  account_id?: string;
+  user_id?: string;
+  changed_by?: string;
+  changed_by_role?: string;
+  change_reason?: string;
+  created_at?: string;
+  full_name?: string;
+  user_mobile?: string;
+  lottery_id?: string;
+  [key: string]: any;
 };
 
 const inputClass =
@@ -56,6 +86,17 @@ const labelClass = "mb-2 block text-sm text-gray-300";
 
 const cardClass =
   "rounded-2xl border border-[#244632] bg-[#10251a] p-4";
+
+const ACCOUNT_FIELDS = [
+  { key: "account_holder_name", label: "Account Holder Name" },
+  { key: "account_number", label: "Account Number / Mobile Number" },
+  { key: "bank_name", label: "Bank Name" },
+  { key: "branch_name", label: "Branch Name" },
+  { key: "routing_number", label: "Routing Number" },
+  { key: "account_type", label: "Account Type" },
+  { key: "wallet_address", label: "Wallet Address" },
+  { key: "network", label: "Network" },
+] as const;
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -73,18 +114,39 @@ function formatAmount(value: any) {
   });
 }
 
-function getSnapshot(item: Withdrawal) {
+function getSnapshotRelation(item: Withdrawal): SnapshotRelation {
   const relation = item.withdrawal_account_snapshots;
 
   if (Array.isArray(relation)) {
-    return relation[0]?.account_snapshot || {};
+    return relation[0] || {};
   }
 
-  return {};
+  return relation || {};
+}
+
+function getSnapshot(item: Withdrawal): AccountDetails {
+  const relation = getSnapshotRelation(item);
+  return relation.account_snapshot || {};
+}
+
+function getSnapshotAccountId(item: Withdrawal) {
+  const relation = getSnapshotRelation(item);
+  const snapshot = getSnapshot(item);
+
+  return relation.account_id || snapshot.account_id || "";
 }
 
 function getProfile(item: Withdrawal) {
   return item.profiles || {};
+}
+
+function getFieldLabel(key: string) {
+  const known = ACCOUNT_FIELDS.find((field) => field.key === key);
+  if (known) return known.label;
+
+  return key.replace(/_/g, " ").replace(/\b\w/g, (char) =>
+    char.toUpperCase()
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -138,6 +200,19 @@ export default function WithdrawalManagementPage() {
   const [savingSettings, setSavingSettings] = useState(false);
 
   const [savingMethodId, setSavingMethodId] = useState("");
+  const [savingLogoId, setSavingLogoId] = useState("");
+
+  const [editingAccountWithdrawal, setEditingAccountWithdrawal] =
+    useState<Withdrawal | null>(null);
+  const [accountForm, setAccountForm] = useState<AccountDetails>({});
+  const [accountChangeReason, setAccountChangeReason] = useState("");
+  const [savingAccount, setSavingAccount] = useState(false);
+
+  const [auditAccountId, setAuditAccountId] = useState("");
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
+
   const [notice, setNotice] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -169,7 +244,6 @@ export default function WithdrawalManagementPage() {
 
       try {
         const access = await checkAdminAccess();
-
         const role = access?.role || "";
 
         if (!["admin", "super_admin"].includes(role)) {
@@ -224,6 +298,7 @@ export default function WithdrawalManagementPage() {
 
     return withdrawals.filter((item) => {
       const profile = getProfile(item);
+      const snapshot = getSnapshot(item);
 
       return [
         item.tracking_id,
@@ -233,6 +308,9 @@ export default function WithdrawalManagementPage() {
         profile.full_name,
         profile.user_mobile,
         profile.lottery_id,
+        snapshot.account_holder_name,
+        snapshot.account_number,
+        snapshot.wallet_address,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term));
@@ -272,7 +350,10 @@ export default function WithdrawalManagementPage() {
     window.setTimeout(() => setNotice(""), 4000);
   }
 
-  function openReview(item: Withdrawal, nextDecision: "approved" | "rejected") {
+  function openReview(
+    item: Withdrawal,
+    nextDecision: "approved" | "rejected"
+  ) {
     setSelectedWithdrawal(item);
     setDecision(nextDecision);
     setAdminNote(item.admin_note || "");
@@ -282,10 +363,7 @@ export default function WithdrawalManagementPage() {
   async function submitReview() {
     if (!selectedWithdrawal) return;
 
-    if (
-      decision === "rejected" &&
-      !rejectionReason.trim()
-    ) {
+    if (decision === "rejected" && !rejectionReason.trim()) {
       setErrorMessage("Rejection reason is required.");
       return;
     }
@@ -393,6 +471,160 @@ export default function WithdrawalManagementPage() {
     }
   }
 
+  async function saveMethodLogo(method: WithdrawalMethod) {
+    if (!isSuperAdmin) return;
+
+    setSavingLogoId(method.id);
+    setErrorMessage("");
+
+    try {
+      const result = await invokeManager({
+        action: "update_method_logo",
+        method_id: method.id,
+        logo_url: (method.logo_url || "").trim(),
+      });
+
+      if (result?.method) {
+        setMethods((current) =>
+          current.map((item) =>
+            item.id === method.id ? result.method : item
+          )
+        );
+      }
+
+      showSuccess(`${method.method_name} logo URL updated.`);
+      await loadData(true);
+    } catch (error: any) {
+      setErrorMessage(error?.message || "Unable to update payment method logo");
+    } finally {
+      setSavingLogoId("");
+    }
+  }
+
+  function openAccountEditor(item: Withdrawal) {
+    if (!isSuperAdmin) return;
+
+    const snapshot = getSnapshot(item);
+
+    setEditingAccountWithdrawal(item);
+    setAccountForm({
+      account_holder_name: snapshot.account_holder_name || "",
+      account_number: snapshot.account_number || "",
+      bank_name: snapshot.bank_name || "",
+      branch_name: snapshot.branch_name || "",
+      routing_number: snapshot.routing_number || "",
+      account_type: snapshot.account_type || "",
+      wallet_address: snapshot.wallet_address || "",
+      network: snapshot.network || "",
+    });
+    setAccountChangeReason("");
+  }
+
+  function updateAccountField(field: string, value: string) {
+    setAccountForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  async function submitAccountChange() {
+    if (!isSuperAdmin || !editingAccountWithdrawal) return;
+
+    const accountId = getSnapshotAccountId(editingAccountWithdrawal);
+
+    if (!accountId) {
+      setErrorMessage(
+        "Account ID was not found in this withdrawal snapshot. Account change cannot continue."
+      );
+      return;
+    }
+
+    if (!accountChangeReason.trim()) {
+      setErrorMessage("Please enter the reason for changing this account.");
+      return;
+    }
+
+    const methodCode =
+      editingAccountWithdrawal.payment_method_code.toLowerCase();
+
+    const isWallet =
+      methodCode.includes("usdt") ||
+      methodCode.includes("crypto") ||
+      methodCode.includes("wallet");
+
+    if (isWallet) {
+      if (!String(accountForm.wallet_address || "").trim()) {
+        setErrorMessage("Wallet Address is required.");
+        return;
+      }
+      if (!String(accountForm.network || "").trim()) {
+        setErrorMessage("Network is required.");
+        return;
+      }
+    } else if (!String(accountForm.account_number || "").trim()) {
+      setErrorMessage("Account Number / Mobile Number is required.");
+      return;
+    }
+
+    setSavingAccount(true);
+    setErrorMessage("");
+
+    try {
+      await invokeManager({
+        action: "admin_change_account",
+        account_id: accountId,
+        change_reason: accountChangeReason.trim(),
+        account_holder_name: accountForm.account_holder_name || "",
+        account_number: accountForm.account_number || "",
+        bank_name: accountForm.bank_name || "",
+        branch_name: accountForm.branch_name || "",
+        routing_number: accountForm.routing_number || "",
+        account_type: accountForm.account_type || "",
+        wallet_address: accountForm.wallet_address || "",
+        network: accountForm.network || "",
+      });
+
+      setEditingAccountWithdrawal(null);
+      setAccountForm({});
+      setAccountChangeReason("");
+
+      showSuccess("User withdrawal account updated successfully.");
+      await loadData(true);
+    } catch (error: any) {
+      setErrorMessage(error?.message || "Unable to change user account");
+    } finally {
+      setSavingAccount(false);
+    }
+  }
+
+  async function openAccountAudit(accountId: string) {
+    if (!isSuperAdmin) return;
+
+    if (!accountId) {
+      setErrorMessage("Account ID was not found.");
+      return;
+    }
+
+    setAuditAccountId(accountId);
+    setAuditLogs([]);
+    setShowAudit(true);
+    setLoadingAudit(true);
+    setErrorMessage("");
+
+    try {
+      const result = await invokeManager({
+        action: "get_account_audit",
+        account_id: accountId,
+      });
+
+      setAuditLogs(result?.audit_logs || []);
+    } catch (error: any) {
+      setErrorMessage(error?.message || "Unable to load account audit log");
+    } finally {
+      setLoadingAudit(false);
+    }
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push(`${ADMIN_PATH}/login`);
@@ -448,12 +680,10 @@ export default function WithdrawalManagementPage() {
             <h1 className="text-xl font-bold text-green-400">
               GAZICASINO ADMIN
             </h1>
-
             <p className="mt-1 text-xs text-gray-400">
               Withdrawal Management
             </p>
           </div>
-
           <AdminMenu />
         </div>
       </header>
@@ -672,6 +902,7 @@ export default function WithdrawalManagementPage() {
                 {paginatedWithdrawals.map((item) => {
                   const profile = getProfile(item);
                   const snapshot = getSnapshot(item);
+                  const accountId = getSnapshotAccountId(item);
 
                   return (
                     <div
@@ -728,30 +959,58 @@ export default function WithdrawalManagementPage() {
                         </div>
                       </div>
 
-                      {Object.keys(snapshot).length > 0 && (
-                        <details className="mt-3 rounded-lg border border-[#244632] bg-[#10251a] p-3">
-                          <summary className="cursor-pointer text-sm font-semibold text-green-300">
-                            Withdrawal Account Details
-                          </summary>
+                      <div className="mt-3 rounded-lg border border-[#315d45] bg-[#10251a] p-3">
+                        <p className="mb-3 text-sm font-bold text-green-300">
+                          Withdrawal Account Details
+                        </p>
 
-                          <div className="mt-3 space-y-2">
-                            {Object.entries(snapshot).map(([key, value]) => (
-                              <div
-                                key={key}
-                                className="flex flex-wrap justify-between gap-2 border-b border-[#244632] pb-2 text-xs last:border-0"
-                              >
-                                <span className="text-gray-400">
-                                  {key.replace(/_/g, " ")}
-                                </span>
-                                <span className="max-w-[65%] break-all text-right text-white">
-                                  {typeof value === "object"
-                                    ? JSON.stringify(value)
-                                    : String(value ?? "—")}
-                                </span>
-                              </div>
-                            ))}
+                        {Object.keys(snapshot).filter(
+                          (key) => key !== "account_id"
+                        ).length > 0 ? (
+                          <div className="space-y-2">
+                            {Object.entries(snapshot)
+                              .filter(([key]) => key !== "account_id")
+                              .map(([key, value]) => (
+                                <div
+                                  key={key}
+                                  className="flex flex-wrap justify-between gap-2 border-b border-[#244632] pb-2 text-xs last:border-0"
+                                >
+                                  <span className="text-gray-400">
+                                    {getFieldLabel(key)}
+                                  </span>
+                                  <span className="max-w-[65%] break-all text-right text-white">
+                                    {typeof value === "object" && value !== null
+                                      ? JSON.stringify(value)
+                                      : String(value ?? "—")}
+                                  </span>
+                                </div>
+                              ))}
                           </div>
-                        </details>
+                        ) : (
+                          <p className="text-xs text-yellow-300">
+                            Account snapshot details are not available for this request.
+                          </p>
+                        )}
+                      </div>
+
+                      {isSuperAdmin && (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => openAccountEditor(item)}
+                            disabled={!accountId}
+                            className="rounded-xl border border-yellow-700 bg-yellow-950/30 px-3 py-3 text-xs font-bold text-yellow-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Change Saved Account
+                          </button>
+
+                          <button
+                            onClick={() => openAccountAudit(accountId)}
+                            disabled={!accountId}
+                            className="rounded-xl border border-blue-700 bg-blue-950/30 px-3 py-3 text-xs font-bold text-blue-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Account Audit Log
+                          </button>
+                        </div>
                       )}
 
                       {item.admin_note && (
@@ -840,13 +1099,22 @@ export default function WithdrawalManagementPage() {
               methods.map((method) => (
                 <div key={method.id} className={cardClass}>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-bold">
-                        {method.method_name}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {method.method_code.toUpperCase()}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      {method.logo_url && (
+                        <img
+                          src={method.logo_url}
+                          alt={method.method_name}
+                          className="h-10 w-10 rounded-lg bg-white object-contain p-1"
+                        />
+                      )}
+                      <div>
+                        <h3 className="text-lg font-bold">
+                          {method.method_name}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {method.method_code.toUpperCase()}
+                        </p>
+                      </div>
                     </div>
 
                     <span
@@ -862,6 +1130,51 @@ export default function WithdrawalManagementPage() {
 
                   {isSuperAdmin ? (
                     <>
+                      <div className="mb-4 rounded-xl border border-[#244632] bg-[#09170f] p-3">
+                        <label className={labelClass}>
+                          Payment Method Logo URL
+                        </label>
+                        <input
+                          type="url"
+                          value={method.logo_url || ""}
+                          onChange={(event) =>
+                            updateMethodField(
+                              method.id,
+                              "logo_url",
+                              event.target.value
+                            )
+                          }
+                          className={inputClass}
+                          placeholder="https://example.com/logo.png"
+                        />
+
+                        {method.logo_url && (
+                          <div className="mt-3 flex items-center gap-3">
+                            <img
+                              src={method.logo_url}
+                              alt="Logo preview"
+                              className="h-12 w-12 rounded-lg bg-white object-contain p-1"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
+                            />
+                            <span className="text-xs text-gray-400">
+                              Logo Preview
+                            </span>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => saveMethodLogo(method)}
+                          disabled={savingLogoId === method.id}
+                          className="mt-3 w-full rounded-xl border border-green-700 bg-green-950/30 px-4 py-3 text-sm font-bold text-green-300 disabled:opacity-50"
+                        >
+                          {savingLogoId === method.id
+                            ? "Updating Logo..."
+                            : "Update Payment Method Logo"}
+                        </button>
+                      </div>
+
                       <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-xl bg-[#09170f] p-3">
                         <input
                           type="checkbox"
@@ -1174,6 +1487,190 @@ export default function WithdrawalManagementPage() {
                     : "Confirm Reject"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editingAccountWithdrawal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/80 p-3">
+          <div className="my-auto max-h-[95vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-yellow-700/60 bg-[#10251a] p-4 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-yellow-300">
+                  Change User Withdrawal Account
+                </h2>
+                <p className="mt-1 text-xs text-gray-400">
+                  Super Admin only · {editingAccountWithdrawal.payment_method_name}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setEditingAccountWithdrawal(null)}
+                disabled={savingAccount}
+                className="rounded-lg px-3 py-1 text-xl text-gray-400"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-xl border border-yellow-800/50 bg-yellow-950/20 p-3 text-xs text-yellow-200">
+              সতর্কতা: এই পরিবর্তন ব্যবহারকারীর ভবিষ্যৎ Withdrawal-এর জন্য
+              সংরক্ষিত অ্যাকাউন্ট পরিবর্তন করবে। আগের Withdrawal Snapshot
+              পরিবর্তন করবে না।
+            </div>
+
+            <div className="space-y-3">
+              {ACCOUNT_FIELDS.map((field) => (
+                <div key={field.key}>
+                  <label className={labelClass}>{field.label}</label>
+                  <input
+                    type="text"
+                    value={accountForm[field.key] || ""}
+                    onChange={(event) =>
+                      updateAccountField(field.key, event.target.value)
+                    }
+                    className={inputClass}
+                    placeholder={field.label}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4">
+              <label className={labelClass}>
+                Reason for Account Change (Required)
+              </label>
+              <textarea
+                rows={3}
+                value={accountChangeReason}
+                onChange={(event) =>
+                  setAccountChangeReason(event.target.value)
+                }
+                className={inputClass}
+                placeholder="Write why this account is being changed"
+              />
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setEditingAccountWithdrawal(null)}
+                disabled={savingAccount}
+                className="rounded-xl border border-[#315d45] px-3 py-3 text-sm font-semibold text-gray-300"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={submitAccountChange}
+                disabled={savingAccount || !accountChangeReason.trim()}
+                className="rounded-xl bg-yellow-700 px-3 py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {savingAccount ? "Updating..." : "Confirm Account Change"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAudit && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-black/80 p-3">
+          <div className="my-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-blue-700/60 bg-[#10251a] p-4 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-blue-300">
+                  Account Change Audit Log
+                </h2>
+                <p className="mt-1 break-all text-xs text-gray-500">
+                  Account ID: {auditAccountId}
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowAudit(false)}
+                className="rounded-lg px-3 py-1 text-xl text-gray-400"
+              >
+                ×
+              </button>
+            </div>
+
+            {loadingAudit ? (
+              <div className="py-10 text-center text-sm text-gray-300">
+                Loading audit history...
+              </div>
+            ) : auditLogs.length === 0 ? (
+              <div className="rounded-xl bg-[#09170f] p-6 text-center text-sm text-gray-400">
+                No account change history found.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {auditLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="rounded-xl border border-[#244632] bg-[#09170f] p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-blue-300">
+                        Account Changed
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {formatDate(log.created_at)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-2 text-xs">
+                      <p>
+                        <span className="text-gray-400">User: </span>
+                        <span className="text-white">
+                          {log.full_name || "—"}
+                        </span>
+                      </p>
+
+                      <p>
+                        <span className="text-gray-400">User Mobile: </span>
+                        <span className="text-white">
+                          {log.user_mobile || "—"}
+                        </span>
+                      </p>
+
+                      <p>
+                        <span className="text-gray-400">Lottery ID: </span>
+                        <span className="text-white">
+                          {log.lottery_id || "—"}
+                        </span>
+                      </p>
+
+                      <p>
+                        <span className="text-gray-400">Changed By Role: </span>
+                        <span className="text-white">
+                          {log.changed_by_role || "—"}
+                        </span>
+                      </p>
+
+                      <p>
+                        <span className="text-gray-400">Changed By ID: </span>
+                        <span className="break-all text-white">
+                          {log.changed_by || "—"}
+                        </span>
+                      </p>
+
+                      <div className="rounded-lg bg-[#10251a] p-3">
+                        <p className="text-gray-400">Change Reason</p>
+                        <p className="mt-1 whitespace-pre-wrap text-white">
+                          {log.change_reason || "No reason recorded"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowAudit(false)}
+              className="mt-5 w-full rounded-xl border border-[#315d45] px-4 py-3 text-sm font-semibold text-gray-300"
+            >
+              Close Audit Log
+            </button>
           </div>
         </div>
       )}
