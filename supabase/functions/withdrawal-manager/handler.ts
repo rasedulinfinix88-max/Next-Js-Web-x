@@ -13,6 +13,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("PROJECT_URL") ?? "";
 const serviceRoleKey = Deno.env.get("PROJECT_SERVICE_KEY") ?? "";
+const encryptionSecret = Deno.env.get("WITHDRAWAL_ENCRYPTION_KEY") ?? "";
 
 const supabaseAdmin = createClient(
   supabaseUrl,
@@ -25,24 +26,19 @@ const supabaseAdmin = createClient(
   }
 );
 
-// User JWT সহ RPC client
-function createUserRpcClient(token: string) {
-  return createClient(
-    supabaseUrl,
-    serviceRoleKey,
-    {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+const ACCOUNT_FIELDS = [
+  "account_holder_name",
+  "account_number",
+  "bank_name",
+  "branch_name",
+  "routing_number",
+  "account_type",
+  "wallet_address",
+  "network",
+];
 
 function response(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -71,11 +67,234 @@ function validUuid(value: any) {
   );
 }
 
-function toHex(bytes: Uint8Array) {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+// =========================================
+// AES-256-GCM ENCRYPTION
+// =========================================
+
+async function getEncryptionKey() {
+  if (!encryptionSecret || encryptionSecret.length < 32) {
+    throw new Error("Withdrawal encryption configuration is missing");
+  }
+
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    encoder.encode(encryptionSecret)
+  );
+
+  return await crypto.subtle.importKey(
+    "raw",
+    digest,
+    { name: "AES-GCM" },
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
+
+function toBase64(bytes: Uint8Array) {
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
+function fromBase64(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+async function encryptJson(value: any) {
+  const key = await getEncryptionKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoder.encode(JSON.stringify(value))
+  );
+
+  return `v1.${toBase64(iv)}.${toBase64(
+    new Uint8Array(encrypted)
+  )}`;
+}
+
+async function decryptJson(value: string) {
+  const parts = String(value ?? "").split(".");
+
+  if (parts.length !== 3 || parts[0] !== "v1") {
+    throw new Error("Invalid encrypted account data");
+  }
+
+  const key = await getEncryptionKey();
+  const iv = fromBase64(parts[1]);
+  const ciphertext = fromBase64(parts[2]);
+
+  if (iv.length !== 12) {
+    throw new Error("Invalid encryption IV");
+  }
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    ciphertext
+  );
+
+  return JSON.parse(decoder.decode(decrypted));
+}
+
+// =========================================
+// ACCOUNT DATA VALIDATION
+// =========================================
+
+function normalizeAccountData(methodCode: string, body: any) {
+  const account = {
+    account_holder_name:
+      String(body.account_holder_name ?? "").trim() || null,
+
+    account_number:
+      String(body.account_number ?? "").trim() || null,
+
+    bank_name:
+      String(body.bank_name ?? "").trim() || null,
+
+    branch_name:
+      String(body.branch_name ?? "").trim() || null,
+
+    routing_number:
+      String(body.routing_number ?? "").trim() || null,
+
+    account_type:
+      String(body.account_type ?? "").trim().toLowerCase() || null,
+
+    wallet_address:
+      String(body.wallet_address ?? "").trim() || null,
+
+    network:
+      String(body.network ?? "").trim() || null,
+  };
+
+  if (methodCode === "bkash" || methodCode === "nagad") {
+    if (!account.account_holder_name || !account.account_number) {
+      throw new Error(
+        "Account holder name and account number are required"
+      );
+    }
+  }
+
+  if (methodCode === "bank") {
+    if (
+      !account.bank_name ||
+      !account.branch_name ||
+      !account.account_holder_name ||
+      !account.account_number ||
+      !account.routing_number ||
+      !["savings", "current"].includes(account.account_type)
+    ) {
+      throw new Error(
+        "All required bank account details must be provided"
+      );
+    }
+  }
+
+  if (methodCode === "usdt") {
+    if (!account.wallet_address || !account.network) {
+      throw new Error("Wallet address and network are required");
+    }
+  }
+
+  return account;
+}
+
+async function decryptAccountRow(row: any) {
+  if (!row.encrypted_account_data) {
+    throw new Error("Encrypted account data is unavailable");
+  }
+
+  const decrypted = await decryptJson(row.encrypted_account_data);
+
+  const result: any = {};
+
+  for (const field of ACCOUNT_FIELDS) {
+    result[field] = decrypted[field] ?? null;
+  }
+
+  const {
+    encrypted_account_data,
+    ...safeMetadata
+  } = row;
+
+  return {
+    ...safeMetadata,
+    ...result,
+  };
+}
+
+async function decryptSnapshotRow(row: any) {
+  let snapshot: any = {};
+
+  if (row.encrypted_account_snapshot) {
+    snapshot = await decryptJson(row.encrypted_account_snapshot);
+  }
+
+  return {
+    ...row,
+    account_snapshot: snapshot,
+    encrypted_account_snapshot: undefined,
+  };
+}
+
+async function decryptHistoryRows(rows: any[]) {
+  return Promise.all(
+    (rows ?? []).map(async (item: any) => {
+      const relation = item.withdrawal_account_snapshots;
+
+      if (Array.isArray(relation)) {
+        item.withdrawal_account_snapshots = await Promise.all(
+          relation.map(decryptSnapshotRow)
+        );
+      } else if (relation) {
+        item.withdrawal_account_snapshots =
+          await decryptSnapshotRow(relation);
+      }
+
+      return item;
+    })
+  );
+}
+
+// =========================================
+// USER RPC CLIENT
+// =========================================
+
+function createUserRpcClient(token: string) {
+  return createClient(
+    supabaseUrl,
+    serviceRoleKey,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+// =========================================
+// SECRET PIN VERIFICATION
+// =========================================
 
 function fromHex(hex: string) {
   if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2 !== 0) {
@@ -117,7 +336,7 @@ async function verifySecretPin(pin: string, storedHash: string) {
 
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(pin),
+    encoder.encode(pin),
     "PBKDF2",
     false,
     ["deriveBits"]
@@ -135,7 +354,6 @@ async function verifySecretPin(pin: string, storedHash: string) {
   );
 
   const actual = new Uint8Array(derived);
-
   let difference = 0;
 
   for (let i = 0; i < expected.length; i++) {
@@ -144,6 +362,10 @@ async function verifySecretPin(pin: string, storedHash: string) {
 
   return difference === 0;
 }
+
+// =========================================
+// AUTHENTICATION
+// =========================================
 
 async function authenticate(req: Request) {
   const token = getBearerToken(req);
@@ -192,6 +414,10 @@ function requireSuperAdmin(profile: any) {
   }
 }
 
+// =========================================
+// WITHDRAWAL SETTINGS
+// =========================================
+
 async function getWithdrawalSettings() {
   const { data, error } = await supabaseAdmin
     .from("withdrawal_settings")
@@ -205,7 +431,7 @@ async function getWithdrawalSettings() {
 }
 
 // =========================================
-// NEW: CHECK USER WITHDRAWAL ELIGIBILITY
+// WITHDRAWAL ELIGIBILITY
 // =========================================
 
 async function checkWithdrawalEligibility(profile: any) {
@@ -225,7 +451,6 @@ async function checkWithdrawalEligibility(profile: any) {
     };
   }
 
-  // Approved assessment
   const { data: assessments, error: assessmentError } =
     await supabaseAdmin
       .from("lottery_fee_assessments")
@@ -245,7 +470,6 @@ async function checkWithdrawalEligibility(profile: any) {
 
   const assessmentIds = assessments.map((item: any) => item.id);
 
-  // Payment and verification must belong to the same approved assessment
   const [paymentsResult, verificationResult] = await Promise.all([
     supabaseAdmin
       .from("lottery_fee_payments")
@@ -309,6 +533,10 @@ async function generateTrackingId() {
   );
 }
 
+// =========================================
+// EDGE FUNCTION
+// =========================================
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -326,22 +554,28 @@ serve(async (req) => {
       );
     }
 
+    if (!encryptionSecret || encryptionSecret.length < 32) {
+      return response(
+        { error: "Withdrawal encryption configuration is missing" },
+        500
+      );
+    }
+
     const profile = await authenticate(req);
     const body = await req.json();
     const action = String(body.action ?? "").trim();
 
     // =========================================
-    // NEW: USER WITHDRAWAL PAGE ACCESS CHECK
+    // USER: CHECK WITHDRAWAL ELIGIBILITY
     // =========================================
 
     if (action === "check_withdrawal_eligibility") {
       const eligibility = await checkWithdrawalEligibility(profile);
-
       return response(eligibility);
     }
 
     // =========================================
-    // USER: GET METHODS AND GLOBAL SETTINGS
+    // USER: GET METHODS AND SETTINGS
     // =========================================
 
     if (action === "get_methods") {
@@ -362,29 +596,38 @@ serve(async (req) => {
     }
 
     // =========================================
-    // USER: LIST SAVED ACCOUNTS
+    // USER: LIST ENCRYPTED ACCOUNTS
     // =========================================
 
     if (action === "list_accounts") {
       const { data, error } = await supabaseAdmin
         .from("withdrawal_accounts")
-        .select("*")
+        .select(
+          "id, user_id, payment_method_code, is_default, is_active, created_at, updated_at, encrypted_account_data"
+        )
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      return response({ accounts: data });
+      const accounts = await Promise.all(
+        (data ?? []).map(decryptAccountRow)
+      );
+
+      return response({ accounts });
     }
 
     // =========================================
-    // USER: SAVE WITHDRAWAL ACCOUNT
+    // USER: SAVE ACCOUNT - INSERT ONLY
     // =========================================
 
     if (action === "save_account") {
-      const accountId = body.account_id
-        ? String(body.account_id)
-        : null;
+      if (body.account_id) {
+        return response(
+          { error: "Saved accounts cannot be edited. Contact support." },
+          403
+        );
+      }
 
       const methodCode = String(
         body.payment_method_code ?? ""
@@ -394,10 +637,6 @@ serve(async (req) => {
 
       if (!allowedMethods.includes(methodCode)) {
         return response({ error: "Invalid payment method" }, 400);
-      }
-
-      if (accountId && !validUuid(accountId)) {
-        return response({ error: "Invalid account ID" }, 400);
       }
 
       const { data: method, error: methodError } =
@@ -416,131 +655,91 @@ serve(async (req) => {
         );
       }
 
-      const account = {
-        user_id: profile.id,
-        payment_method_code: methodCode,
-        account_holder_name: String(
-          body.account_holder_name ?? ""
-        ).trim() || null,
-        account_number: String(
-          body.account_number ?? ""
-        ).trim() || null,
-        bank_name: String(body.bank_name ?? "").trim() || null,
-        branch_name: String(body.branch_name ?? "").trim() || null,
-        routing_number: String(
-          body.routing_number ?? ""
-        ).trim() || null,
-        account_type: String(
-          body.account_type ?? ""
-        ).trim().toLowerCase() || null,
-        wallet_address: String(
-          body.wallet_address ?? ""
-        ).trim() || null,
-        network: String(body.network ?? "").trim() || null,
-        is_default: body.is_default === true,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      };
+      let accountData: any;
 
-      if (methodCode === "bkash" || methodCode === "nagad") {
-        if (!account.account_holder_name || !account.account_number) {
-          return response(
-            { error: "Account holder name and account number are required" },
-            400
-          );
-        }
+      try {
+        accountData = normalizeAccountData(methodCode, body);
+      } catch (error) {
+        return response({ error: error.message }, 400);
       }
 
-      if (methodCode === "bank") {
-        if (
-          !account.bank_name ||
-          !account.branch_name ||
-          !account.account_holder_name ||
-          !account.account_number ||
-          !account.routing_number ||
-          !["savings", "current"].includes(account.account_type)
-        ) {
-          return response(
-            { error: "All required bank account details must be provided" },
-            400
-          );
-        }
-      }
-
-      if (methodCode === "usdt") {
-        if (!account.wallet_address || !account.network) {
-          return response(
-            { error: "Wallet address and network are required" },
-            400
-          );
-        }
-      }
-
-      if (accountId) {
-        const { data: existing, error: existingError } =
-          await supabaseAdmin
-            .from("withdrawal_accounts")
-            .select("id")
-            .eq("id", accountId)
-            .eq("user_id", profile.id)
-            .maybeSingle();
-
-        if (existingError) throw existingError;
-
-        if (!existing) {
-          return response({ error: "Account not found" }, 404);
-        }
-
-        const { data, error } = await supabaseAdmin
+      const { data: existing, error: existingError } =
+        await supabaseAdmin
           .from("withdrawal_accounts")
-          .update(account)
-          .eq("id", accountId)
+          .select("id")
           .eq("user_id", profile.id)
-          .select()
-          .single();
+          .eq("payment_method_code", methodCode)
+          .maybeSingle();
 
-        if (error) throw error;
+      if (existingError) throw existingError;
 
-        return response({
-          message: "Withdrawal account updated",
-          account: data,
-        });
+      if (existing) {
+        return response(
+          {
+            error:
+              "You already have an account for this payment method. Contact support to change it.",
+          },
+          409
+        );
       }
+
+      const encrypted = await encryptJson(accountData);
 
       const { data, error } = await supabaseAdmin
         .from("withdrawal_accounts")
-        .insert(account)
-        .select()
+        .insert({
+          user_id: profile.id,
+          payment_method_code: methodCode,
+
+          // Sensitive plaintext fields are never saved.
+          account_holder_name: null,
+          account_number: null,
+          bank_name: null,
+          branch_name: null,
+          routing_number: null,
+          account_type: null,
+          wallet_address: null,
+          network: null,
+
+          encrypted_account_data: encrypted,
+          is_default: body.is_default === true,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .select(
+          "id, user_id, payment_method_code, is_default, is_active, created_at, updated_at, encrypted_account_data"
+        )
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === "23505") {
+          return response(
+            { error: "An account for this method already exists" },
+            409
+          );
+        }
+
+        throw error;
+      }
 
       return response({
-        message: "Withdrawal account saved",
-        account: data,
+        message: "Withdrawal account saved successfully",
+        account: await decryptAccountRow(data),
       });
     }
 
     // =========================================
-    // USER: DELETE SAVED ACCOUNT
+    // USER: DELETE ACCOUNT - DISABLED
     // =========================================
 
     if (action === "delete_account") {
-      const accountId = String(body.account_id ?? "");
-
-      if (!validUuid(accountId)) {
-        return response({ error: "Invalid account ID" }, 400);
-      }
-
-      const { error } = await supabaseAdmin
-        .from("withdrawal_accounts")
-        .delete()
-        .eq("id", accountId)
-        .eq("user_id", profile.id);
-
-      if (error) throw error;
-
-      return response({ message: "Withdrawal account deleted" });
+      return response(
+        {
+          error:
+            "Account deletion is disabled. Contact support for assistance.",
+        },
+        403
+      );
     }
 
     // =========================================
@@ -595,7 +794,9 @@ serve(async (req) => {
       const { data: account, error: accountError } =
         await supabaseAdmin
           .from("withdrawal_accounts")
-          .select("*")
+          .select(
+            "id, user_id, payment_method_code, is_active, encrypted_account_data"
+          )
           .eq("id", accountId)
           .eq("user_id", profile.id)
           .eq("is_active", true)
@@ -607,6 +808,13 @@ serve(async (req) => {
         return response(
           { error: "Withdrawal account not found" },
           404
+        );
+      }
+
+      if (!account.encrypted_account_data) {
+        return response(
+          { error: "Withdrawal account encryption is not ready" },
+          409
         );
       }
 
@@ -641,10 +849,6 @@ serve(async (req) => {
       }
 
       const trackingId = await generateTrackingId();
-
-      // Secure RPC: user JWT দিয়ে auth.uid() যাচাই হবে।
-      // Fee, terms এবং verification শর্ত SQL function যাচাই করবে।
-
       const userToken = getBearerToken(req);
 
       if (!userToken) {
@@ -686,6 +890,7 @@ serve(async (req) => {
           withdrawal_account_snapshots (
             payment_method_code,
             account_snapshot,
+            encrypted_account_snapshot,
             created_at
           )
         `)
@@ -694,7 +899,9 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return response({ history: data });
+      return response({
+        history: await decryptHistoryRows(data ?? []),
+      });
     }
 
     // =========================================
@@ -717,7 +924,8 @@ serve(async (req) => {
           ),
           withdrawal_account_snapshots (
             payment_method_code,
-            account_snapshot
+            account_snapshot,
+            encrypted_account_snapshot
           )
         `)
         .order("created_at", { ascending: false });
@@ -730,7 +938,9 @@ serve(async (req) => {
 
       if (error) throw error;
 
-      return response({ withdrawals: data });
+      return response({
+        withdrawals: await decryptHistoryRows(data ?? []),
+      });
     }
 
     // =========================================
@@ -781,6 +991,125 @@ serve(async (req) => {
       return response({
         message: `Withdrawal ${decision} successfully`,
         withdrawal: data,
+      });
+    }
+
+    // =========================================
+    // ADMIN: UPDATE PAYMENT METHOD LOGO
+    // =========================================
+
+    if (action === "update_method_logo") {
+      requireAdmin(profile);
+
+      const methodId = String(body.method_id ?? "");
+
+      if (!validUuid(methodId)) {
+        return response({ error: "Invalid method ID" }, 400);
+      }
+
+      const logoUrl = String(body.logo_url ?? "").trim();
+
+      if (logoUrl) {
+        try {
+          const parsed = new URL(logoUrl);
+
+          if (!["http:", "https:"].includes(parsed.protocol)) {
+            throw new Error("Invalid protocol");
+          }
+        } catch {
+          return response(
+            { error: "A valid HTTP or HTTPS logo URL is required" },
+            400
+          );
+        }
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from("withdrawal_payment_methods")
+        .update({
+          logo_url: logoUrl || null,
+          updated_at: new Date().toISOString(),
+          updated_by: profile.id,
+        })
+        .eq("id", methodId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      return response({
+        message: "Payment method logo updated",
+        method: data,
+      });
+    }
+
+    // =========================================
+    // SUPER ADMIN: CHANGE USER ACCOUNT
+    // =========================================
+
+    if (action === "admin_change_account") {
+      requireSuperAdmin(profile);
+
+      const accountId = String(body.account_id ?? "");
+      const reason = String(body.change_reason ?? "").trim();
+
+      if (!validUuid(accountId)) {
+        return response({ error: "Invalid account ID" }, 400);
+      }
+
+      if (reason.length < 5 || reason.length > 1000) {
+        return response(
+          { error: "A change reason of 5 to 1000 characters is required" },
+          400
+        );
+      }
+
+      const { data: existing, error: existingError } =
+        await supabaseAdmin
+          .from("withdrawal_accounts")
+          .select(
+            "id, user_id, payment_method_code, encrypted_account_data"
+          )
+          .eq("id", accountId)
+          .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (!existing) {
+        return response({ error: "Account not found" }, 404);
+      }
+
+      if (!existing.encrypted_account_data) {
+        return response(
+          { error: "Existing account encryption is missing" },
+          409
+        );
+      }
+
+      const newAccountData = normalizeAccountData(
+        existing.payment_method_code,
+        body
+      );
+
+      const newEncrypted = await encryptJson(newAccountData);
+
+      const { data, error } = await supabaseAdmin.rpc(
+        "withdrawal_admin_change_account",
+        {
+          p_account_id: existing.id,
+          p_user_id: existing.user_id,
+          p_changed_by: profile.id,
+          p_change_reason: reason,
+          p_old_encrypted_data: existing.encrypted_account_data,
+          p_new_encrypted_data: newEncrypted,
+        }
+      );
+
+      if (error) throw error;
+
+      return response({
+        message: "Account changed and audit record created",
+        result: data,
       });
     }
 
@@ -908,7 +1237,8 @@ serve(async (req) => {
     return response({ error: "Invalid action" }, 400);
 
   } catch (error) {
-    console.error("Withdrawal Manager Error:", error);
+    // Do not log account data, PINs, or encryption secrets.
+    console.error("Withdrawal Manager Error:", error.message);
 
     return response(
       { error: error.message ?? "Internal server error" },
