@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
@@ -6,6 +5,80 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../../../lib/supabase/client";
 import LotteryHeader from "../../../../components/Header/Header";
 import LotteryFooter from "../../../../components/Footer/Footer";
+
+// ================= 7-DAY CYCLE SIMULATION (SOLD + LIVE) =================
+const CYCLE_DAYS = 7;
+const TOTAL_TICKETS = 5000;
+
+function seededRandom01(seed: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 1000000) / 1000000;
+}
+
+// Cycle starts at 00:30 and runs for 7 days.
+// If current time is before 00:30, we're still in yesterday's cycle.
+function getCycleStart(now: Date): Date {
+  const d = new Date(now);
+  if (d.getHours() === 0 && d.getMinutes() < 30) {
+    d.setDate(d.getDate() - 1);
+  }
+  d.setHours(0, 30, 0, 0);
+  d.setDate(d.getDate() - (d.getDate() % CYCLE_DAYS));
+  return d;
+}
+
+function getCycleKey(now: Date): string {
+  const start = getCycleStart(now);
+  return start.toISOString().slice(0, 10);
+}
+
+// Sold-out target: 5 or 6 days after cycle start, random time,
+// different per draw AND per cycle.
+function getSoldOutTarget(drawId: string, now: Date) {
+  const cycleStart = getCycleStart(now);
+  const cycleKey = getCycleKey(now);
+
+  const daySeed = seededRandom01(drawId + "|soldday|" + cycleKey);
+  const soldDay = 5 + Math.floor(daySeed * 2); // 5 or 6
+
+  const timeSeed = seededRandom01(drawId + "|soldtime|" + cycleKey);
+  const minuteOfDay = Math.floor(timeSeed * (23 * 60 + 30)); // 00:00 - 23:30
+
+  const target = new Date(cycleStart);
+  target.setDate(target.getDate() + (soldDay - 1));
+  target.setHours(0, 0, 0, 0);
+  target.setMinutes(minuteOfDay);
+
+  return { target, cycleStart };
+}
+
+// Sold count: 0 -> 5000 linear over ~5-6 days, locked at 5000 until
+// 00:30 of day 8 (new cycle resets to 0).
+function getSimulatedSold(drawId: string, now: Date): number {
+  const { target, cycleStart } = getSoldOutTarget(drawId, now);
+
+  if (now.getTime() >= target.getTime()) return TOTAL_TICKETS;
+  if (now.getTime() <= cycleStart.getTime()) return 0;
+
+  const total = target.getTime() - cycleStart.getTime();
+  const elapsed = now.getTime() - cycleStart.getTime();
+  const progress = Math.max(0, Math.min(1, elapsed / total));
+  return Math.min(TOTAL_TICKETS, Math.floor(progress * TOTAL_TICKETS));
+}
+
+// Live viewers: 500-1500, unique per draw, up/down every ~6s.
+function getLiveViewers(drawId: string, now: Date): number {
+  const bucket = Math.floor(now.getTime() / 6000);
+  const base = 700 + Math.floor(seededRandom01(drawId + "|lvbase") * 600);
+  const variation =
+    Math.floor(seededRandom01(drawId + "|lv-" + bucket) * 400) - 200;
+  return Math.max(500, Math.min(1500, base + variation));
+}
+// ==========================================================================
 
 type JackpotDraw = {
   id: string;
@@ -89,6 +162,10 @@ function JackpotTicketBuyContent() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const [qrError, setQrError] = useState("");
+
+  // Simulated Sold / Live Viewers
+  const [displayedSold, setDisplayedSold] = useState(0);
+  const [liveViewers, setLiveViewers] = useState(0);
 
   const pendingRequestId = useRef<string | null>(null);
 
@@ -176,6 +253,23 @@ function JackpotTicketBuyContent() {
       active = false;
     };
   }, [drawId, router]);
+
+  // Simulated Sold + Live Viewers: refresh every 5s, resets at
+  // 00:30 of day 8 (new cycle).
+  useEffect(() => {
+    const id = draw?.id;
+    if (!id) return;
+
+    const update = () => {
+      const now = new Date();
+      setDisplayedSold(getSimulatedSold(id, now));
+      setLiveViewers(getLiveViewers(id, now));
+    };
+
+    update();
+    const interval = setInterval(update, 5000);
+    return () => clearInterval(interval);
+  }, [draw?.id]);
 
   const handleBuyTicket = async () => {
     if (!draw || !profile || !drawId || buying) return;
@@ -465,25 +559,33 @@ function JackpotTicketBuyContent() {
                         TICKETS SOLD
                       </p>
                       <p className="font-bold mt-1">
-                        {formatMoney(draw.total_tickets_sold)}
+                        {formatMoney(displayedSold)}
                       </p>
                     </div>
                   </div>
 
                   <div className="mt-4 rounded-lg bg-black/30 p-3 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center">
                       <span className="text-gray-400">
                         Draw Status
                       </span>
-                      <strong
-                        className={
-                          draw.status === "open"
-                            ? "text-green-400"
-                            : "text-yellow-300"
-                        }
-                      >
-                        {draw.status.toUpperCase()}
-                      </strong>
+
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-red-400">
+                          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                          {formatMoney(liveViewers)}+ LIVE
+                        </span>
+
+                        <strong
+                          className={
+                            draw.status === "open"
+                              ? "text-green-400"
+                              : "text-yellow-300"
+                          }
+                        >
+                          {draw.status.toUpperCase()}
+                        </strong>
+                      </div>
                     </div>
                   </div>
                 </>
