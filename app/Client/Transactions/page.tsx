@@ -35,6 +35,8 @@ export default function TransactionsPage() {
   const [withdrawalError, setWithdrawalError] = useState("");
 
   const loadTransactions = useCallback(async () => {
+    const startTime = Date.now();
+
     setLoading(true);
     setDepositError("");
     setWithdrawalError("");
@@ -136,6 +138,13 @@ export default function TransactionsPage() {
         )
       );
     } finally {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 2700 - elapsed);
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, remaining);
+      });
+
       setLoading(false);
     }
   }, [t]);
@@ -216,17 +225,6 @@ export default function TransactionsPage() {
       <LotteryHeader />
 
       <main className="mx-auto w-full max-w-[700px] px-3 pb-32 pt-5 sm:px-5">
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-white">
-            {t("Transaction History", "লেনদেনের হিস্টোরি")}
-          </h1>
-          <p className="mt-1 text-sm text-gray-400">
-            {t(
-              "View your deposit and withdrawal activities.",
-              "আপনার ডিপোজিট ও উইথড্র লেনদেন দেখুন।"
-            )}
-          </p>
-        </div>
 
         <div className="mb-5 grid grid-cols-3 gap-2 rounded-xl border border-[#294438] bg-[#142d23] p-2">
           {tabs.map((tab) => (
@@ -246,11 +244,76 @@ export default function TransactionsPage() {
         </div>
 
         {loading ? (
-          <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-[#294438] bg-[#1B2A23]">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#315b45] border-t-green-400" />
-            <p className="text-sm text-gray-400">
-              {t("Loading transactions...", "লেনদেন লোড হচ্ছে...")}
-            </p>
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-[#294438] bg-[#1B2A23]">
+
+            <svg
+              viewBox="0 0 180 160"
+              width="180"
+              height="160"
+              xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="Loading transactions"
+              className="overflow-visible"
+            >
+              <g className="transaction-animation">
+
+                {/* TRANSACTION RECEIPT */}
+
+                <path
+                  d="M61 25 H119 V111 L112 105 L105 111 L98 105 L90 111 L82 105 L75 111 L68 105 L61 111 Z"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  strokeLinejoin="round"
+                />
+
+                {/* RECEIPT LINES */}
+
+                <path
+                  d="M75 43 H105 M75 57 H105 M75 71 H93"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+
+                {/* TRANSACTION ARROW */}
+
+                <path
+                  d="M76 88 H103 L96 81 M103 88 L96 95"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+              </g>
+
+              {/* SIDE TRANSACTION SYMBOLS */}
+
+              <g className="transaction-dot">
+                <circle
+                  cx="39"
+                  cy="55"
+                  r="4"
+                  fill="#ffffff"
+                />
+                <circle
+                  cx="141"
+                  cy="55"
+                  r="4"
+                  fill="#ffffff"
+                />
+                <circle
+                  cx="90"
+                  cy="132"
+                  r="3"
+                  fill="#ffffff"
+                />
+              </g>
+            </svg>
+
           </div>
         ) : currentError ? (
           <div className="rounded-xl border border-red-500/20 bg-[#1B2A23] px-4 py-8 text-center">
@@ -388,6 +451,45 @@ export default function TransactionsPage() {
       </main>
 
       <LotteryFooter />
+
+      <style jsx>{`
+        .transaction-animation {
+          transform-box: fill-box;
+          transform-origin: center;
+          animation: transaction-pulse 2.7s ease-in-out infinite;
+        }
+
+        .transaction-dot {
+          animation: transaction-dots 2.7s ease-in-out infinite;
+        }
+
+        @keyframes transaction-pulse {
+          0% {
+            opacity: 0.65;
+            transform: scale(0.94);
+          }
+
+          50% {
+            opacity: 1;
+            transform: scale(1.04);
+          }
+
+          100% {
+            opacity: 0.65;
+            transform: scale(0.94);
+          }
+        }
+
+        @keyframes transaction-dots {
+          0%, 100% {
+            opacity: 0.35;
+          }
+
+          50% {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }
