@@ -28,20 +28,22 @@ type Profile = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "12px",
-  borderRadius: "9px",
-  background: "#111b16",
-  border: "1px solid #34483b",
+  padding: "14px 15px",
+  borderRadius: "12px",
+  background: "#101c18",
+  border: "1px solid #34483e",
   color: "#ffffff",
   outline: "none",
   fontSize: "14px",
+  transition: "border-color .2s ease",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  color: "#a9b9ae",
+  color: "#9eafa6",
   fontSize: "12px",
-  marginBottom: "7px",
+  fontWeight: 600,
+  marginBottom: "8px",
 };
 
 export default function ProfilePage() {
@@ -361,7 +363,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0d241e]">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b1713]">
         <style>{`
           @keyframes profilePulse {
             0%,100% { transform:scale(1); opacity:.65; }
@@ -373,18 +375,33 @@ export default function ProfilePage() {
           }
           .profile-pulse { animation:profilePulse 1.4s ease-in-out infinite; }
           .profile-ring { animation:profileRing 2s linear infinite; transform-origin:center; }
+          .premium-card {
+            background: linear-gradient(145deg, #172820 0%, #111d18 100%);
+            border: 1px solid #2b4035;
+            box-shadow: 0 12px 35px rgba(0,0,0,.16);
+          }
+          .premium-input:focus {
+            border-color: #52b788 !important;
+            box-shadow: 0 0 0 3px rgba(82,183,136,.10);
+          }
+          .premium-action {
+            transition: all .2s ease;
+          }
+          .premium-action:active {
+            transform: scale(.985);
+          }
         `}</style>
 
         <div className="relative w-24 h-24 flex items-center justify-center">
           <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full profile-ring">
             <circle cx="50" cy="50" r="43" fill="none" stroke="#315c43" strokeWidth="4" />
-            <path d="M50 7 A43 43 0 0 1 93 50" fill="none" stroke="#00e676" strokeWidth="4" strokeLinecap="round" />
+            <path d="M50 7 A43 43 0 0 1 93 50" fill="none" stroke="#52b788" strokeWidth="4" strokeLinecap="round" />
           </svg>
 
           <svg viewBox="0 0 48 48" className="w-12 h-12 profile-pulse" fill="none" stroke="#b8f5ce" strokeWidth="2">
             <circle cx="24" cy="15" r="8" />
             <path d="M8 42c0-9 7-15 16-15s16 6 16 15" strokeLinecap="round" />
-            <path d="M35 8l3 3 5-5" stroke="#00e676" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M35 8l3 3 5-5" stroke="#52b788" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
 
@@ -399,75 +416,184 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d241e] text-white pb-24">
+    <div className="min-h-screen bg-[#0b1713] text-white pb-24">
+      <style>{`
+        .premium-card {
+          background: linear-gradient(145deg, #172820 0%, #111d18 100%);
+          border: 1px solid #2b4035;
+          box-shadow: 0 12px 35px rgba(0,0,0,.16);
+        }
+        .premium-input:focus {
+          border-color: #52b788 !important;
+          box-shadow: 0 0 0 3px rgba(82,183,136,.10);
+        }
+        .premium-action {
+          transition: all .2s ease;
+        }
+        .premium-action:active {
+          transform: scale(.985);
+        }
+        .premium-divider {
+          border-color: rgba(125,153,136,.16);
+        }
+      `}</style>
+
       <LotteryHeader userProfile={profile} />
 
-      <main className="max-w-xl mx-auto px-3 py-4 space-y-4">
+      <main className="max-w-2xl mx-auto px-3 sm:px-5 py-5 space-y-5">
+        {/* PAGE INTRO */}
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div>
+            <p className="text-[10px] font-bold tracking-[2.5px] text-[#65b88d] uppercase">
+              Account Management
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight mt-1">
+              My Profile
+            </h1>
+            <p className="text-xs text-[#879b8e] mt-1">
+              Manage your personal information and account security
+            </p>
+          </div>
+
+          <div className="w-11 h-11 rounded-2xl bg-[#193729] border border-[#315b43] flex items-center justify-center shrink-0">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#82d9a8" strokeWidth="1.7">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
+            </svg>
+          </div>
+        </div>
+
         {pageError && (
-          <div className="bg-red-950/40 border border-red-700 rounded-xl p-4 text-sm text-red-200">
-            {pageError}
-            <button
-              onClick={() => window.location.reload()}
-              className="block mt-3 underline"
-            >
-              Try Again
-            </button>
+          <div className="rounded-2xl border border-red-800/70 bg-red-950/40 p-4 text-sm text-red-200">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">!</span>
+              <div className="flex-1">
+                <p className="font-bold">Unable to load profile</p>
+                <p className="mt-1 text-xs leading-5">{pageError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-3 text-xs font-bold underline underline-offset-4"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {profile && (
           <>
-            <section className="rounded-2xl border border-[#315640] bg-gradient-to-br from-[#194b34] to-[#10291e] p-4 shadow-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 rounded-full bg-[#286647] border border-[#70c993] flex items-center justify-center">
-                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7">
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
-                  </svg>
+            {/* PROFILE OVERVIEW */}
+            <section className="relative overflow-hidden rounded-3xl border border-[#315a43] bg-gradient-to-br from-[#1b4933] via-[#153725] to-[#10251c] p-5 shadow-[0_18px_45px_rgba(0,0,0,.22)]">
+              <div className="absolute -right-12 -top-16 w-48 h-48 rounded-full border border-white/[0.06]" />
+              <div className="absolute -right-5 -top-9 w-32 h-32 rounded-full border border-white/[0.05]" />
+              <div className="absolute right-10 bottom-[-75px] w-40 h-40 rounded-full bg-[#55bd83]/10 blur-2xl" />
+
+              <div className="relative">
+                <div className="flex items-center gap-4">
+                  <div className="w-[68px] h-[68px] rounded-2xl bg-gradient-to-br from-[#3d8058] to-[#1c5136] border border-[#8bd5a6]/40 flex items-center justify-center shadow-lg shrink-0">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#eafff0" strokeWidth="1.5">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
+                    </svg>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold tracking-[2px] text-[#a5d9b7] uppercase">
+                      Account Profile
+                    </p>
+                    <h2 className="text-xl font-extrabold truncate mt-1">
+                      {profile.full_name || "User"}
+                    </h2>
+                    <p className="text-xs text-[#c1dfcb] mt-1">
+                      Lottery ID: <span className="font-bold tracking-wider">{profile.lottery_id || "—"}</span>
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <h1 className="font-bold text-lg truncate">
-                    {profile.full_name || "User"}
-                  </h1>
-                  <p className="text-xs text-green-200 mt-1">
-                    Lottery ID: {profile.lottery_id || "—"}
-                  </p>
-                  <span className="inline-block mt-2 text-[10px] bg-green-500/20 text-green-200 px-2 py-1 rounded-full">
+                <div className="flex flex-wrap items-center gap-2 mt-5">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#83d6a2]/30 bg-[#83d6a2]/10 px-3 py-1.5 text-[10px] font-bold tracking-wide text-[#b9f2cc]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#70dc99]" />
                     {(profile.account_status || "unknown").toUpperCase()}
                   </span>
-                </div>
-              </div>
 
-              <div className="mt-4 rounded-xl bg-black/20 p-3">
-                <p className="text-xs text-green-200">AVAILABLE BALANCE</p>
-                <p className="text-2xl font-extrabold mt-1">
-                  ৳ {Number(profile.balance || 0).toLocaleString("en-BD", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-                <p className="text-[10px] text-green-200/70 mt-1">
-                  Wallet balance · View only
-                </p>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/10 px-3 py-1.5 text-[10px] font-semibold text-[#c4d7ca]">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" />
+                      <path d="M9 12l2 2 4-4" />
+                    </svg>
+                    {profile.user_role || "User"}
+                  </span>
+                </div>
+
+                {/* BALANCE */}
+                <div className="mt-5 rounded-2xl border border-white/[0.10] bg-[#071b12]/45 p-4 backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold tracking-[2px] text-[#a5d9b7] uppercase">
+                        Available Balance
+                      </p>
+                      <p className="text-[10px] text-[#85a993] mt-1">
+                        Your current wallet balance
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-[#62c58b]/10 border border-[#62c58b]/20 flex items-center justify-center">
+                      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#8be0aa" strokeWidth="1.7">
+                        <rect x="2.5" y="5" width="19" height="15" rx="3" />
+                        <path d="M2.5 9h19M16 14h2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <p className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-3 tabular-nums">
+                    <span className="text-[#a9e9bd] text-2xl mr-1">৳</span>
+                    {Number(profile.balance || 0).toLocaleString("en-BD", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#70dc99]" />
+                    <p className="text-[10px] text-[#a7c9b2]">
+                      Wallet balance · View only
+                    </p>
+                  </div>
+                </div>
               </div>
             </section>
 
+            {/* FEEDBACK */}
             {message && (
-              <div className="rounded-lg border border-green-600 bg-green-950/40 p-3 text-sm text-green-200">
+              <div className="rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-200 flex items-center gap-3">
+                <span className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">✓</span>
                 {message}
               </div>
             )}
 
             {error && (
-              <div className="rounded-lg border border-red-700 bg-red-950/40 p-3 text-sm text-red-200">
-                {error}
+              <div className="rounded-2xl border border-red-700/60 bg-red-950/40 p-4 text-sm text-red-200 flex items-start gap-3">
+                <span className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">!</span>
+                <span className="break-words">{error}</span>
               </div>
             )}
 
-            <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold">Personal Information</h2>
+            {/* PERSONAL INFORMATION */}
+            <section className="premium-card rounded-3xl overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-5 border-b premium-divider">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#214633] border border-[#37664a] flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8bd6a6" strokeWidth="1.7">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-[15px]">Personal Information</h2>
+                    <p className="text-[10px] text-[#82998b] mt-1">Your personal account details</p>
+                  </div>
+                </div>
+
                 {!editing && (
                   <button
                     onClick={() => {
@@ -475,175 +601,288 @@ export default function ProfilePage() {
                       setMessage("");
                       setEditing(true);
                     }}
-                    className="text-xs font-bold text-green-300 border border-green-700 rounded-lg px-3 py-2"
+                    className="premium-action rounded-xl border border-[#4b9667]/50 bg-[#244b35] px-3 py-2.5 text-[10px] font-extrabold tracking-wide text-[#b8edc8]"
                   >
                     EDIT PROFILE
                   </button>
                 )}
               </div>
 
-              {editing ? (
-                <form onSubmit={saveProfile} className="space-y-3">
-                  <div>
-                    <label style={labelStyle}>Full Name</label>
-                    <input style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Birthday</label>
-                    <input style={inputStyle} type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Postal Code</label>
-                    <input style={inputStyle} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>City / Area</label>
-                    <input style={inputStyle} value={cityAddress} onChange={(e) => setCityAddress(e.target.value)} />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>Full Address</label>
-                    <textarea style={{ ...inputStyle, minHeight: "85px" }} value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} />
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-[#00e676] text-black font-bold py-3 disabled:opacity-50">
-                      {saving ? "SAVING..." : "SAVE CHANGES"}
-                    </button>
-                    <button type="button" onClick={() => { fillForm(profile); setEditing(false); }} className="px-4 rounded-lg bg-[#34443a] font-semibold">
-                      CANCEL
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  {[
-                    ["Full Name", profile.full_name],
-                    ["Mobile Number", profile.user_mobile],
-                    ["Birthday", profile.user_birthday],
-                    ["Postal Code", profile.postal_code],
-                    ["City / Area", profile.city_address],
-                    ["Full Address", profile.user_address_store],
-                  ].map(([label, value]) => (
-                    <div key={label} className="border-b border-[#2c4034] pb-3 last:border-0">
-                      <p className="text-[11px] text-[#91a99a]">{label}</p>
-                      <p className="text-sm mt-1 break-words">{value || "Not added"}</p>
+              <div className="p-5">
+                {editing ? (
+                  <form onSubmit={saveProfile} className="space-y-4">
+                    <div>
+                      <label style={labelStyle}>Full Name</label>
+                      <input className="premium-input" style={inputStyle} value={fullName} onChange={(e) => setFullName(e.target.value)} required />
                     </div>
-                  ))}
-                  <p className="text-[10px] text-[#82988a]">
-                    Mobile number changes require a separate verification process.
-                  </p>
-                </div>
-              )}
-            </section>
 
-            <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4">
-              <h2 className="font-bold mb-4">Account Verification</h2>
-              {[
-                ["Lottery Fee", profile.user_lottery_fee_paid ? "Paid" : "Not Paid"],
-                ["Terms Accepted", profile.user_lottery_is_terms_accepted ? "Yes" : "No"],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-3 py-2 border-b border-[#2c4034] last:border-0">
-                  <span className="text-xs text-[#a9b9ae]">{label}</span>
-                  <span className="text-xs font-semibold">{value}</span>
-                </div>
-              ))}
-            </section>
+                    <div>
+                      <label style={labelStyle}>Birthday</label>
+                      <input className="premium-input" style={inputStyle} type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+                    </div>
 
-            <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4 space-y-3">
-              <h2 className="font-bold">Security Settings</h2>
+                    <div>
+                      <label style={labelStyle}>Postal Code</label>
+                      <input className="premium-input" style={inputStyle} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+                    </div>
 
-              <button
-                onClick={() => {
-                  setPasswordOpen(!passwordOpen);
-                  setPinOpen(false);
-                  setError("");
-                  setMessage("");
-                }}
-                className="w-full flex justify-between items-center bg-[#20372a] rounded-lg p-3 text-sm font-semibold"
-              >
-                <span>Change Password</span>
-                <span>{passwordOpen ? "−" : "+"}</span>
-              </button>
+                    <div>
+                      <label style={labelStyle}>City / Area</label>
+                      <input className="premium-input" style={inputStyle} value={cityAddress} onChange={(e) => setCityAddress(e.target.value)} />
+                    </div>
 
-              {passwordOpen && (
-                <form onSubmit={changePassword} className="space-y-3">
-                  <div>
-                    <label style={labelStyle}>Current Password</label>
-                    <input style={inputStyle} type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>New Password (8+ characters)</label>
-                    <input style={inputStyle} type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Confirm New Password</label>
-                    <input style={inputStyle} type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                  </div>
-                  <button disabled={passwordBusy} className="w-full bg-[#00e676] text-black rounded-lg py-3 font-bold">
-                    {passwordBusy ? "UPDATING..." : "UPDATE PASSWORD"}
-                  </button>
-                  <div className="text-right">
-                    <button type="button" onClick={support} className="text-xs text-green-300 underline">
-                      Forgot password? Support
-                    </button>
-                  </div>
-                </form>
-              )}
+                    <div>
+                      <label style={labelStyle}>Full Address</label>
+                      <textarea className="premium-input" style={{ ...inputStyle, minHeight: "100px", resize: "vertical" }} value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} />
+                    </div>
 
-              <button
-                onClick={() => {
-                  setPinOpen(!pinOpen);
-                  setPasswordOpen(false);
-                  setError("");
-                  setMessage("");
-                }}
-                className="w-full flex justify-between items-center bg-[#20372a] rounded-lg p-3 text-sm font-semibold"
-              >
-                <span>Change Secret PIN</span>
-                <span>{pinOpen ? "−" : "+"}</span>
-              </button>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button type="submit" disabled={saving} className="premium-action flex-1 rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] font-extrabold py-3.5 text-xs tracking-wide shadow-lg shadow-emerald-950/30 disabled:opacity-50">
+                        {saving ? "SAVING..." : "SAVE CHANGES"}
+                      </button>
+                      <button type="button" onClick={() => { fillForm(profile); setEditing(false); }} className="premium-action rounded-xl border border-[#405347] bg-[#25372d] px-6 py-3.5 text-xs font-bold text-[#c6d4ca]">
+                        CANCEL
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5">
+                    {[
+                      ["Full Name", profile.full_name],
+                      ["Mobile Number", profile.user_mobile],
+                      ["Birthday", profile.user_birthday],
+                      ["Postal Code", profile.postal_code],
+                      ["City / Area", profile.city_address],
+                      ["Full Address", profile.user_address_store],
+                    ].map(([label, value]) => (
+                      <div key={label} className="py-3.5 border-b premium-divider last:border-0">
+                        <p className="text-[10px] font-semibold tracking-wide text-[#82998b] uppercase">{label}</p>
+                        <p className="text-sm font-medium text-[#e3ece6] mt-1.5 break-words">
+                          {value || "Not added"}
+                        </p>
+                      </div>
+                    ))}
 
-              {pinOpen && (
-                <form onSubmit={changePin} className="space-y-3">
-                  <div>
-                    <label style={labelStyle}>Current 4-Digit PIN</label>
-                    <input style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={currentPin} onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
+                    <div className="sm:col-span-2 mt-4 rounded-xl border border-[#344b3c] bg-[#13231a] p-3 flex items-start gap-2.5">
+                      <svg className="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ac8a9" strokeWidth="1.8">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 11v5M12 8h.01" strokeLinecap="round" />
+                      </svg>
+                      <p className="text-[10px] leading-5 text-[#9caf9f]">
+                        Mobile number changes require a separate verification process.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label style={labelStyle}>New 4-Digit PIN</label>
-                    <input style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Confirm New PIN</label>
-                    <input style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
-                  </div>
-                  <button disabled={pinBusy} className="w-full bg-[#00e676] text-black rounded-lg py-3 font-bold">
-                    {pinBusy ? "UPDATING..." : "UPDATE SECRET PIN"}
-                  </button>
-                  <div className="text-right">
-                    <button type="button" onClick={support} className="text-xs text-green-300 underline">
-                      Forgot PIN? Support
-                    </button>
-                  </div>
-                </form>
-              )}
-            </section>
-
-            <section className="rounded-xl border border-[#2b4034] bg-[#17251d] p-4">
-              <h2 className="font-bold mb-3">Account Information</h2>
-              <div className="flex justify-between py-2">
-                <span className="text-xs text-[#a9b9ae]">Join Date</span>
-                <span className="text-xs">
-                  {profile.created_at
-                    ? new Date(profile.created_at).toLocaleDateString("en-GB")
-                    : "—"}
-                </span>
+                )}
               </div>
             </section>
+
+            {/* ACCOUNT VERIFICATION */}
+            <section className="premium-card rounded-3xl overflow-hidden">
+              <div className="p-5 border-b premium-divider flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#214633] border border-[#37664a] flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8bd6a6" strokeWidth="1.7">
+                    <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" />
+                    <path d="M9 12l2 2 4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="font-bold text-[15px]">Account Verification</h2>
+                  <p className="text-[10px] text-[#82998b] mt-1">Review your account requirements</p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-3">
+                {[
+                  ["Lottery Fee", profile.user_lottery_fee_paid ? "Paid" : "Not Paid", profile.user_lottery_fee_paid],
+                  ["Terms Accepted", profile.user_lottery_is_terms_accepted ? "Yes" : "No", profile.user_lottery_is_terms_accepted],
+                ].map(([label, value, verified]) => (
+                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-xl border border-[#304538] bg-[#14231a] px-4 py-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-[#203c2c] flex items-center justify-center shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9bcaaa" strokeWidth="1.8">
+                          <path d="M5 12l4 4L19 6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-semibold text-[#c8d7cd]">{label}</span>
+                    </div>
+
+                    <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${
+                      verified
+                        ? "bg-emerald-500/10 text-[#8fe0aa] border border-emerald-500/20"
+                        : "bg-amber-500/10 text-[#e6c17b] border border-amber-500/20"
+                    }`}>
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* SECURITY SETTINGS */}
+            <section className="premium-card rounded-3xl overflow-hidden">
+              <div className="p-5 border-b premium-divider flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#214633] border border-[#37664a] flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8bd6a6" strokeWidth="1.7">
+                    <rect x="4" y="10" width="16" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 018 0v3M12 14v3" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="font-bold text-[15px]">Security Settings</h2>
+                  <p className="text-[10px] text-[#82998b] mt-1">Protect your account credentials</p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-3">
+                {/* PASSWORD */}
+                <button
+                  onClick={() => {
+                    setPasswordOpen(!passwordOpen);
+                    setPinOpen(false);
+                    setError("");
+                    setMessage("");
+                  }}
+                  className="premium-action w-full flex justify-between items-center gap-3 rounded-2xl border border-[#344d3d] bg-[#17291e] p-4 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#244a34] flex items-center justify-center">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#a5e4b9" strokeWidth="1.7">
+                        <rect x="4" y="10" width="16" height="11" rx="2" />
+                        <path d="M8 10V7a4 4 0 018 0v3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#e5eee8]">Change Password</p>
+                      <p className="text-[10px] text-[#849b8c] mt-1">Update your login password</p>
+                    </div>
+                  </div>
+                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-[#a9d9b8] text-lg">
+                    {passwordOpen ? "−" : "+"}
+                  </span>
+                </button>
+
+                {passwordOpen && (
+                  <form onSubmit={changePassword} className="rounded-2xl border border-[#344d3d] bg-[#101d16] p-4 space-y-4">
+                    <div>
+                      <label style={labelStyle}>Current Password</label>
+                      <input className="premium-input" style={inputStyle} type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>New Password (8+ characters)</label>
+                      <input className="premium-input" style={inputStyle} type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Confirm New Password</label>
+                      <input className="premium-input" style={inputStyle} type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                    </div>
+                    <button disabled={passwordBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
+                      {passwordBusy ? "UPDATING..." : "UPDATE PASSWORD"}
+                    </button>
+                    <div className="text-right">
+                      <button type="button" onClick={support} className="text-xs font-semibold text-[#8ed5a7] underline underline-offset-4">
+                        Forgot password? Support
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* SECRET PIN */}
+                <button
+                  onClick={() => {
+                    setPinOpen(!pinOpen);
+                    setPasswordOpen(false);
+                    setError("");
+                    setMessage("");
+                  }}
+                  className="premium-action w-full flex justify-between items-center gap-3 rounded-2xl border border-[#344d3d] bg-[#17291e] p-4 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#244a34] flex items-center justify-center">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#a5e4b9" strokeWidth="1.7">
+                        <circle cx="8" cy="15" r="4" />
+                        <path d="M11 12l8-8M16 7l2 2M18 5l2 2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#e5eee8]">Change Secret PIN</p>
+                      <p className="text-[10px] text-[#849b8c] mt-1">Manage your 4-digit security PIN</p>
+                    </div>
+                  </div>
+                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-[#a9d9b8] text-lg">
+                    {pinOpen ? "−" : "+"}
+                  </span>
+                </button>
+
+                {pinOpen && (
+                  <form onSubmit={changePin} className="rounded-2xl border border-[#344d3d] bg-[#101d16] p-4 space-y-4">
+                    <div>
+                      <label style={labelStyle}>Current 4-Digit PIN</label>
+                      <input className="premium-input" style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={currentPin} onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>New 4-Digit PIN</label>
+                      <input className="premium-input" style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Confirm New PIN</label>
+                      <input className="premium-input" style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
+                    </div>
+                    <button disabled={pinBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
+                      {pinBusy ? "UPDATING..." : "UPDATE SECRET PIN"}
+                    </button>
+                    <div className="text-right">
+                      <button type="button" onClick={support} className="text-xs font-semibold text-[#8ed5a7] underline underline-offset-4">
+                        Forgot PIN? Support
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </section>
+
+            {/* ACCOUNT INFORMATION */}
+            <section className="premium-card rounded-3xl overflow-hidden">
+              <div className="p-5 border-b premium-divider flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#214633] border border-[#37664a] flex items-center justify-center">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8bd6a6" strokeWidth="1.7">
+                    <rect x="3" y="5" width="18" height="16" rx="2" />
+                    <path d="M16 3v4M8 3v4M3 10h18" strokeLinecap="round" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="font-bold text-[15px]">Account Information</h2>
+                  <p className="text-[10px] text-[#82998b] mt-1">Your account registration details</p>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#304538] bg-[#14231a] px-4 py-4">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-wide text-[#82998b] uppercase">
+                      Join Date
+                    </p>
+                    <p className="text-sm font-bold text-[#e3ece6] mt-1.5">
+                      {profile.created_at
+                        ? new Date(profile.created_at).toLocaleDateString("en-GB")
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-[#203c2c] flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9bcaaa" strokeWidth="1.7">
+                      <rect x="3" y="5" width="18" height="16" rx="2" />
+                      <path d="M16 3v4M8 3v4M3 10h18" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div className="text-center pt-1 pb-2">
+              <p className="text-[10px] text-[#657c6d] tracking-wide">
+                Your account information is protected
+              </p>
+            </div>
           </>
         )}
       </main>
