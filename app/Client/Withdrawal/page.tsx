@@ -101,7 +101,6 @@ export default function WithdrawalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
 
-  // NEW: Withdrawal eligibility state
   const [eligibility, setEligibility] = useState<any>(null);
 
   const [amount, setAmount] = useState("");
@@ -245,12 +244,10 @@ export default function WithdrawalPage() {
 
       if (!userProfile) return;
 
-      // NEW: Check eligibility before loading Withdrawal features
       const accessCheck = await invokeFunction({
         action: "check_withdrawal_eligibility",
       });
 
-      // Fail closed: only explicit approval grants access
       if (accessCheck?.eligible !== true) {
         setEligibility({
           eligible: false,
@@ -263,20 +260,16 @@ export default function WithdrawalPage() {
             ),
         });
 
-        // Terms must be accepted first
         if (accessCheck?.reason === "terms_not_accepted") {
           router.replace("/withdraw-terms/");
           return;
         }
 
-        // Fee payment must be approved first
         if (accessCheck?.reason === "fee_not_approved") {
           router.replace("/fee-payment/");
           return;
         }
 
-        // Other pending/rejected verification:
-        // Keep Withdrawal features inaccessible.
         return;
       }
 
@@ -286,7 +279,6 @@ export default function WithdrawalPage() {
         message: accessCheck.message,
       });
 
-      // Existing page data loading remains unchanged
       const results = await Promise.allSettled([
         loadMethods(),
         loadAccounts(),
@@ -301,7 +293,6 @@ export default function WithdrawalPage() {
         throw failed.reason;
       }
     } catch (error: any) {
-      // NEW: If eligibility check fails, block access
       setEligibility({
         eligible: false,
         reason: "check_failed",
@@ -335,22 +326,6 @@ export default function WithdrawalPage() {
     setAccountType("savings");
     setWalletAddress("");
     setNetwork("");
-  };
-
-  const editAccount = (account: WithdrawalAccount) => {
-    setSelectedAccount(account);
-
-    setAccountHolder(account.account_holder_name || "");
-    setAccountNumber(account.account_number || "");
-    setBankName(account.bank_name || "");
-    setBranchName(account.branch_name || "");
-    setRoutingNumber(account.routing_number || "");
-    setAccountType(account.account_type || "savings");
-    setWalletAddress(account.wallet_address || "");
-    setNetwork(account.network || "");
-
-    setShowAccountForm(true);
-    setMessage({ type: "", text: "" });
   };
 
   const handleSaveAccount = async () => {
@@ -448,41 +423,6 @@ export default function WithdrawalPage() {
       notify("error", getErrorMessage(error));
     } finally {
       setSavingAccount(false);
-    }
-  };
-
-  const handleDeleteAccount = async (accountId: string) => {
-    const confirmed = window.confirm(
-      t(
-        "Are you sure you want to delete this account?",
-        "আপনি কি এই অ্যাকাউন্টটি মুছে ফেলতে চান?"
-      )
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setMessage({ type: "", text: "" });
-
-      const data = await invokeFunction({
-        action: "delete_account",
-        account_id: accountId,
-      });
-
-      if (selectedAccount?.id === accountId) {
-        resetAccountForm();
-        setShowAccountForm(false);
-      }
-
-      notify(
-        "success",
-        data.message ||
-          t("Account deleted.", "অ্যাকাউন্ট মুছে ফেলা হয়েছে।")
-      );
-
-      await loadAccounts();
-    } catch (error: any) {
-      notify("error", getErrorMessage(error));
     }
   };
 
@@ -647,7 +587,6 @@ export default function WithdrawalPage() {
     );
   }
 
-  // NEW: Block the entire Withdrawal page until approval
   if (eligibility?.eligible !== true) {
     const checkFailed = eligibility?.reason === "check_failed";
 
@@ -925,24 +864,6 @@ export default function WithdrawalPage() {
                           )}
                         </div>
                       </label>
-
-                      <div className="flex justify-end gap-3 mt-3 border-t border-white/10 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => editAccount(account)}
-                          className="text-[11px] text-white font-bold"
-                        >
-                          {t("Edit", "এডিট")}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAccount(account.id)}
-                          className="text-[11px] text-red-400 font-bold"
-                        >
-                          {t("Delete", "মুছুন")}
-                        </button>
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -951,9 +872,7 @@ export default function WithdrawalPage() {
                 {showAccountForm && (
                   <div className="mt-5 border-t border-white/10 pt-4">
                     <h4 className="text-white font-bold text-sm mb-4">
-                      {selectedAccount
-                        ? t("Edit Account", "অ্যাকাউন্ট পরিবর্তন")
-                        : t("Add New Account", "নতুন অ্যাকাউন্ট যোগ করুন")}
+                      {t("Add New Account", "নতুন অ্যাকাউন্ট যোগ করুন")}
                     </h4>
 
                     {(selectedMethod.method_code === "bkash" ||
