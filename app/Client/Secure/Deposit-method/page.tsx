@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../../lib/supabase/client";
+import { useLanguage } from "../../../../lib/LanguageContext";
 import Header from "../../../../components/Header/Header";
 import Footer from "../../../../components/Footer/Footer";
 import "./page.css";
@@ -26,6 +27,7 @@ type PaymentMethod = {
 type DepositResponse = {
   success: boolean;
   message?: string;
+  error?: string;
   deposit_enabled?: boolean;
   maintenance_message?: string;
   methods?: PaymentMethod[];
@@ -39,8 +41,41 @@ type DepositResponse = {
   };
 };
 
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  const functionError = error as {
+    message?: string;
+    context?: Response;
+  };
+
+  const context = functionError?.context;
+
+  if (context && typeof context.clone === "function") {
+    try {
+      const body = await context.clone().json();
+
+      if (typeof body?.error === "string") {
+        return body.error;
+      }
+
+      if (typeof body?.message === "string") {
+        return body.message;
+      }
+    } catch {
+      // Use the original error message when the response is not readable.
+    }
+  }
+
+  return functionError?.message || "Request failed";
+}
+
 export default function DepositMethodPage() {
   const supabase = useMemo(() => createClient(), []);
+  const { language, t } = useLanguage();
+
+  const translate = useCallback(
+    (en: string, bn: string) => t(en, bn),
+    [language]
+  );
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -81,7 +116,9 @@ export default function DepositMethodPage() {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        throw new Error("প্রথমে আপনার Account-এ Login করুন।");
+        throw new Error(
+          translate("Please login to your account first.", "প্রথমে আপনার Account-এ Login করুন।")
+        );
       }
 
       const { data: profile, error: profileError } = await supabase
@@ -91,7 +128,9 @@ export default function DepositMethodPage() {
         .single();
 
       if (profileError) {
-        throw new Error("Account Balance লোড করা যায়নি।");
+        throw new Error(
+          translate("Could not load account balance.", "Account Balance লোড করা যায়নি।")
+        );
       }
 
       setBalance(Number(profile?.balance ?? 0));
@@ -106,13 +145,23 @@ export default function DepositMethodPage() {
       );
 
       if (error) {
-        throw new Error(error.message || "Deposit Service সংযোগ করা যায়নি।");
+        const serverMessage = await getFunctionErrorMessage(error);
+
+        throw new Error(
+          serverMessage === "Request failed"
+            ? translate("Could not connect to deposit service.", "Deposit Service সংযোগ করা যায়নি।")
+            : serverMessage
+        );
       }
 
       const result = data as DepositResponse;
 
       if (!result?.success) {
-        throw new Error(result?.message || "Payment Methods পাওয়া যায়নি।");
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            translate("Payment methods not found.", "Payment Methods পাওয়া যায়নি।")
+        );
       }
 
       const activeMethods = (result.methods || []).filter(
@@ -138,13 +187,13 @@ export default function DepositMethodPage() {
       showMessage(
         error instanceof Error
           ? error.message
-          : "একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+          : translate("Something went wrong. Please try again.", "একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।"),
         "error"
       );
     } finally {
       setLoading(false);
     }
-  }, [supabase, showMessage]);
+  }, [supabase, showMessage, translate]);
 
   useEffect(() => {
     loadDepositData();
@@ -188,13 +237,17 @@ export default function DepositMethodPage() {
     setTrackingId("");
 
     if (!selectedMethod) {
-      showMessage("একটি Payment Method নির্বাচন করুন।", "error");
+      showMessage(
+        translate("Please select a payment method.", "একটি Payment Method নির্বাচন করুন।"),
+        "error"
+      );
       return;
     }
 
     if (!depositEnabled) {
       showMessage(
-        maintenanceMessage || "Deposit Service বর্তমানে বন্ধ আছে।",
+        maintenanceMessage ||
+          translate("Deposit service is currently disabled.", "Deposit Service বর্তমানে বন্ধ আছে।"),
         "error"
       );
       return;
@@ -202,19 +255,31 @@ export default function DepositMethodPage() {
 
     if (!paymentDetailsReady) {
       showMessage(
-        "এই Payment Method-এর Receiving Details এখনো যুক্ত করা হয়নি।",
+        translate(
+          "Receiving details for this payment method are not configured yet.",
+          "এই Payment Method-এর Receiving Details এখনো যুক্ত করা হয়নি।"
+        ),
         "error"
       );
       return;
     }
 
     if (!amountValid) {
-      showMessage("সঠিক Deposit Amount লিখুন।", "error");
+      showMessage(
+        translate("Please enter a valid deposit amount.", "সঠিক Deposit Amount লিখুন।"),
+        "error"
+      );
       return;
     }
 
     if (!transactionIdValid) {
-      showMessage("Transaction ID কমপক্ষে ৬ অক্ষর বা সংখ্যা হতে হবে।", "error");
+      showMessage(
+        translate(
+          "Transaction ID must be at least 6 characters.",
+          "Transaction ID কমপক্ষে ৬ অক্ষর বা সংখ্যা হতে হবে।"
+        ),
+        "error"
+      );
       return;
     }
 
@@ -227,7 +292,9 @@ export default function DepositMethodPage() {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        throw new Error("আপনার Login Session পাওয়া যায়নি।");
+        throw new Error(
+          translate("Your login session was not found.", "আপনার Login Session পাওয়া যায়নি।")
+        );
       }
 
       const { data, error } = await supabase.functions.invoke(
@@ -244,13 +311,47 @@ export default function DepositMethodPage() {
       );
 
       if (error) {
-        throw new Error(error.message || "Deposit Request পাঠানো যায়নি।");
+        const serverMessage = await getFunctionErrorMessage(error);
+
+        if (
+          serverMessage ===
+          "This transaction ID has already been used"
+        ) {
+          throw new Error(
+            translate(
+              "This Transaction ID has already been used. Please enter a different Transaction ID.",
+              "এই Transaction ID আগে ব্যবহার করা হয়েছে। অনুগ্রহ করে অন্য Transaction ID দিন।"
+            )
+          );
+        }
+
+        if (
+          serverMessage ===
+          "Transaction ID must be 3 to 120 characters"
+        ) {
+          throw new Error(
+            translate(
+              "Invalid Transaction ID. It must contain 6 to 120 characters.",
+              "Transaction ID সঠিক নয়। এতে ৬ থেকে ১২০টি অক্ষর বা সংখ্যা থাকতে হবে।"
+            )
+          );
+        }
+
+        throw new Error(
+          serverMessage === "Request failed"
+            ? translate("Could not submit deposit request.", "Deposit Request পাঠানো যায়নি।")
+            : serverMessage
+        );
       }
 
       const result = data as DepositResponse;
 
       if (!result?.success) {
-        throw new Error(result?.message || "Deposit Request ব্যর্থ হয়েছে।");
+        throw new Error(
+          result?.error ||
+            result?.message ||
+            translate("Deposit request failed.", "Deposit Request ব্যর্থ হয়েছে।")
+        );
       }
 
       setTrackingId(result.deposit?.deposit_tracking_id || "");
@@ -259,14 +360,18 @@ export default function DepositMethodPage() {
       setSenderAccount("");
 
       showMessage(
-        result.message || "আপনার Deposit Request সফলভাবে জমা হয়েছে।",
+        result.message ||
+          translate(
+            "Your deposit request has been submitted successfully.",
+            "আপনার Deposit Request সফলভাবে জমা হয়েছে।"
+          ),
         "success"
       );
     } catch (error) {
       showMessage(
         error instanceof Error
           ? error.message
-          : "Deposit Request পাঠাতে সমস্যা হয়েছে।",
+          : translate("Could not submit deposit request.", "Deposit Request পাঠাতে সমস্যা হয়েছে।"),
         "error"
       );
     } finally {
@@ -286,9 +391,15 @@ export default function DepositMethodPage() {
 
     try {
       await navigator.clipboard.writeText(details);
-      showMessage("Payment Details Copy হয়েছে।", "success");
+      showMessage(
+        translate("Payment details copied.", "Payment Details Copy হয়েছে।"),
+        "success"
+      );
     } catch {
-      showMessage("Copy করা যায়নি। নিজে Copy করুন।", "error");
+      showMessage(
+        translate("Could not copy. Please copy manually.", "Copy করা যায়নি। নিজে Copy করুন।"),
+        "error"
+      );
     }
   };
 
@@ -303,7 +414,7 @@ export default function DepositMethodPage() {
         <Header />
         <main className="deposit-loading-content">
           <div className="deposit-loader" />
-          <p>Deposit System লোড হচ্ছে...</p>
+          <p>{translate("Loading deposit system...", "Deposit System লোড হচ্ছে...")}</p>
         </main>
         <Footer />
       </div>
@@ -317,16 +428,22 @@ export default function DepositMethodPage() {
       <main className="secure-main">
         {!depositEnabled && (
           <div className="msg-box error">
-            {maintenanceMessage || "Deposit Service বর্তমানে বন্ধ আছে।"}
+            {maintenanceMessage ||
+              translate("Deposit service is currently disabled.", "Deposit Service বর্তমানে বন্ধ আছে।")}
           </div>
         )}
 
         <section className="deposit-section">
-          <h3 className="sec-title">Select Payment Method</h3>
+          <h3 className="sec-title">
+            {translate("Select Payment Method", "Payment Method নির্বাচন করুন")}
+          </h3>
 
           {methods.length === 0 ? (
             <div className="deposit-empty">
-              বর্তমানে কোনো Payment Method Active নেই।
+              {translate(
+                "No payment methods are currently active.",
+                "বর্তমানে কোনো Payment Method Active নেই।"
+              )}
             </div>
           ) : (
             <div className="payment-grid">
@@ -368,7 +485,9 @@ export default function DepositMethodPage() {
         {selectedMethod && (
           <>
             <section className="deposit-section">
-              <h3 className="sec-title">Payment Details</h3>
+              <h3 className="sec-title">
+                {translate("Payment Details", "Payment Details")}
+              </h3>
 
               <div className="instruction-box">
                 {selectedMethod.instructions && (
@@ -392,13 +511,15 @@ export default function DepositMethodPage() {
                       className="copy-btn-small"
                       onClick={copyPaymentDetails}
                     >
-                      COPY
+                      {translate("COPY", "কপি")}
                     </button>
                   </div>
                 ) : (
                   <p className="payment-not-configured">
-                    এই Method-এর Receiving Details Admin এখনো Configure
-                    করেননি।
+                    {translate(
+                      "Receiving details for this method have not been configured by Admin.",
+                      "এই Method-এর Receiving Details Admin এখনো Configure করেননি।"
+                    )}
                   </p>
                 )}
               </div>
@@ -406,10 +527,14 @@ export default function DepositMethodPage() {
 
             <form onSubmit={handleSubmit} className="deposit-form-card">
               <section className="deposit-form-field">
-                <h3 className="sec-title">Deposit Amount</h3>
+                <h3 className="sec-title">
+                  {translate("Deposit Amount", "Deposit Amount")}
+                </h3>
 
                 <p className="deposit-limit">
-                  Minimum: 20 <span>|</span> Maximum: 10000
+                  {translate("Minimum", "সর্বনিম্ন")}: 20
+                  <span>|</span>
+                  {translate("Maximum", "সর্বোচ্চ")}: 10000
                 </p>
 
                 <div className="quick-amount-grid">
@@ -433,7 +558,7 @@ export default function DepositMethodPage() {
                   inputMode="decimal"
                   min="0"
                   step="any"
-                  placeholder="Enter Amount"
+                  placeholder={translate("Enter Amount", "পরিমাণ লিখুন")}
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
                   required
@@ -441,24 +566,28 @@ export default function DepositMethodPage() {
               </section>
 
               <section className="deposit-form-field">
-                <h3 className="sec-title">Sender Account / Wallet</h3>
+                <h3 className="sec-title">
+                  {translate("Sender Account / Wallet", "প্রেরকের Account / Wallet")}
+                </h3>
 
                 <input
                   className="trx-input"
                   type="text"
-                  placeholder="optional"
+                  placeholder={translate("Optional", "ঐচ্ছিক")}
                   value={senderAccount}
                   onChange={(event) => setSenderAccount(event.target.value)}
                 />
               </section>
 
               <section className="deposit-form-field">
-                <h3 className="sec-title">Transaction ID</h3>
+                <h3 className="sec-title">
+                  {translate("Transaction ID", "Transaction ID")}
+                </h3>
 
                 <input
                   className="trx-input"
                   type="text"
-                  placeholder="Enter Transaction ID"
+                  placeholder={translate("Enter Transaction ID", "Transaction ID লিখুন")}
                   value={transactionId}
                   onChange={(event) =>
                     setTransactionId(
@@ -473,7 +602,10 @@ export default function DepositMethodPage() {
                 />
 
                 <p className="transaction-hint">
-                  Minimum 6 characters or numbers
+                  {translate(
+                    "Minimum 6 characters or numbers",
+                    "কমপক্ষে ৬টি অক্ষর বা সংখ্যা"
+                  )}
                 </p>
               </section>
 
@@ -485,9 +617,14 @@ export default function DepositMethodPage() {
 
               {trackingId && (
                 <div className="deposit-tracking-box">
-                  <span>Deposit Tracking ID</span>
+                  <span>{translate("Deposit Tracking ID", "Deposit Tracking ID")}</span>
                   <strong>{trackingId}</strong>
-                  <p>আপনার Request এখন Pending অবস্থায় আছে।</p>
+                  <p>
+                    {translate(
+                      "Your request is currently pending.",
+                      "আপনার Request এখন Pending অবস্থায় আছে।"
+                    )}
+                  </p>
                 </div>
               )}
 
@@ -497,7 +634,9 @@ export default function DepositMethodPage() {
                   className="submit-btn"
                   disabled={!canSubmit}
                 >
-                  {submitting ? "Please Wait..." : "Submit Deposit"}
+                  {submitting
+                    ? translate("Please Wait...", "অপেক্ষা করুন...")
+                    : translate("Submit Deposit", "Deposit জমা দিন")}
                 </button>
               </div>
             </form>
