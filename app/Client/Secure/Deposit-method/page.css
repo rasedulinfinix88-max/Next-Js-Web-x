@@ -29,7 +29,7 @@
 .secure-main {
   flex: 1;
   min-height: 0;
-  padding: 12px 16px;
+  padding: 12px 16px 20px;
   max-width: 600px;
   margin: 0 auto;
   width: 100%;
@@ -37,7 +37,6 @@
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  padding-bottom: 100px;
   scrollbar-width: thin;
   scrollbar-color: var(--border-color) transparent;
 }
@@ -118,6 +117,10 @@
 .payment-option.active {
   border-color: #0d241e;
   background: rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 0 0 1px var(--btn-green),
+    0 0 0 2px rgba(24, 79, 53, 0.35);
+  transform: translateY(-1px);
 }
 
 .payment-option img {
@@ -273,13 +276,14 @@
   transition: background 0.2s;
 }
 
-.quick-amount-btn + .quick-amount-btn {
-  border-left: none;
-}
-
 .quick-amount-btn.active {
   background: var(--btn-green);
   color: var(--white);
+}
+
+.quick-amount-btn:focus-visible {
+  outline: 1px solid var(--btn-green);
+  outline-offset: -2px;
 }
 
 /* Inputs */
@@ -317,6 +321,12 @@
 .trx-input::placeholder {
   color: var(--text-muted);
   opacity: 0.8;
+}
+
+.transaction-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 6px 2px 0;
 }
 
 /* Messages */
@@ -382,21 +392,19 @@
   color: var(--text-muted);
 }
 
-/* Submit Button */
+/* Submit Button - Footer-এর আগে থাকবে */
 
 .deposit-submit-space {
   height: 12px;
 }
 
 .submit-btn-wrapper {
-  position: fixed;
-  bottom: 0;
-  left: 0;
+  position: static;
   width: 100%;
-  padding: 12px 16px;
-  background: var(--bg-main);
-  border-top: 1px solid var(--border-color);
-  z-index: 50;
+  padding: 0;
+  background: transparent;
+  border: none;
+  z-index: auto;
 }
 
 .submit-btn {
@@ -443,13 +451,5 @@
 
   .deposit-form-card {
     padding: 12px;
-  }
-}
-
-@media (min-width: 601px) {
-  .submit-btn-wrapper {
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 600px;
   }
 }
