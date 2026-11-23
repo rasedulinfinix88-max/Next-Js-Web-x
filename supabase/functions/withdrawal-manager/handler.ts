@@ -237,17 +237,40 @@ async function decryptAccountRow(row: any) {
   };
 }
 
+// =========================================
+// SNAPSHOT DECRYPTION
+// =========================================
+
 async function decryptSnapshotRow(row: any) {
   let snapshot: any = {};
 
   if (row.encrypted_account_snapshot) {
     snapshot = await decryptJson(row.encrypted_account_snapshot);
+  } else if (
+    row.account_snapshot &&
+    typeof row.account_snapshot === "object" &&
+    !Array.isArray(row.account_snapshot)
+  ) {
+    // Preserve legacy plaintext snapshots.
+    snapshot = row.account_snapshot;
   }
 
+  if (
+    !snapshot ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
+    snapshot = {};
+  }
+
+  const {
+    encrypted_account_snapshot,
+    ...safeRow
+  } = row;
+
   return {
-    ...row,
+    ...safeRow,
     account_snapshot: snapshot,
-    encrypted_account_snapshot: undefined,
   };
 }
 
@@ -260,9 +283,11 @@ async function decryptHistoryRows(rows: any[]) {
         item.withdrawal_account_snapshots = await Promise.all(
           relation.map(decryptSnapshotRow)
         );
-      } else if (relation) {
+      } else if (relation && typeof relation === "object") {
         item.withdrawal_account_snapshots =
           await decryptSnapshotRow(relation);
+      } else {
+        item.withdrawal_account_snapshots = [];
       }
 
       return item;
@@ -534,6 +559,56 @@ async function generateTrackingId() {
 }
 
 // =========================================
+// AUDIT LOG READER
+// =========================================
+
+async function getAccountAuditLogs(accountId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("withdrawal_account_change_audit")
+    .select(
+      "id, account_id, user_id, changed_by, changed_by_role, change_reason, created_at"
+    )
+    .eq("account_id", accountId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  const logs = data ?? [];
+
+  if (logs.length === 0) {
+    return [];
+  }
+
+  const profileIds = Array.from(
+    new Set(
+      logs.flatMap((item: any) => [
+        item.user_id,
+        item.changed_by,
+      ]).filter(Boolean)
+    )
+  );
+
+  const { data: profiles, error: profilesError } =
+    await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, user_mobile, lottery_id")
+      .in("id", profileIds);
+
+  if (profilesError) throw profilesError;
+
+  const profileMap = new Map(
+    (profiles ?? []).map((item: any) => [item.id, item])
+  );
+
+  return logs.map((item: any) => ({
+    ...item,
+    user_profile: profileMap.get(item.user_id) ?? null,
+    changed_by_profile: profileMap.get(item.changed_by) ?? null,
+  }));
+}
+
+// =========================================
 // EDGE FUNCTION
 // =========================================
 
@@ -691,7 +766,6 @@ serve(async (req) => {
           user_id: profile.id,
           payment_method_code: methodCode,
 
-          // Sensitive plaintext fields are never saved.
           account_holder_name: null,
           account_number: null,
           bank_name: null,
@@ -1110,6 +1184,26 @@ serve(async (req) => {
       return response({
         message: "Account changed and audit record created",
         result: data,
+      });
+    }
+
+    // =========================================
+    // SUPER ADMIN: GET ACCOUNT AUDIT LOG
+    // =========================================
+
+    if (action === "get_account_audit") {
+      requireSuperAdmin(profile);
+
+      const accountId = String(body.account_id ?? "");
+
+      if (!validUuid(accountId)) {
+        return response({ error: "Invalid account ID" }, 400);
+      }
+
+      const logs = await getAccountAuditLogs(accountId);
+
+      return response({
+        audit_logs: logs,
       });
     }
 
