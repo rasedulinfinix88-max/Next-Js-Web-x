@@ -97,6 +97,50 @@ export default function DepositMethodPage() {
 
   const [trackingId, setTrackingId] = useState("");
 
+  // Loading animation states
+  const [loadingStage, setLoadingStage] = useState<
+    "preparing" | "verifying" | "success" | "cash"
+  >("preparing");
+
+  const [introComplete, setIntroComplete] = useState(false);
+  const [cashAnimationDone, setCashAnimationDone] = useState(false);
+
+  // First 5.8 seconds: payment verification messages
+  useEffect(() => {
+    const verifyTimer = window.setTimeout(() => {
+      setLoadingStage("verifying");
+    }, 2000);
+
+    const successTimer = window.setTimeout(() => {
+      setLoadingStage("success");
+    }, 3700);
+
+    const introTimer = window.setTimeout(() => {
+      setIntroComplete(true);
+    }, 5800);
+
+    return () => {
+      window.clearTimeout(verifyTimer);
+      window.clearTimeout(successTimer);
+      window.clearTimeout(introTimer);
+    };
+  }, []);
+
+  // Show the Cash SVG only after both the intro and Supabase loading finish
+  useEffect(() => {
+    if (!introComplete || loading) return;
+
+    setLoadingStage("cash");
+
+    const cashTimer = window.setTimeout(() => {
+      setCashAnimationDone(true);
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(cashTimer);
+    };
+  }, [introComplete, loading]);
+
   const showMessage = useCallback(
     (text: string, type: "success" | "error") => {
       setMessage(text);
@@ -408,14 +452,88 @@ export default function DepositMethodPage() {
       ? selectedMethod.wallet_address
       : selectedMethod?.admin_payment_number;
 
-  if (loading) {
+  // Loading screen: intro + Supabase data + Cash SVG animation
+  if (loading || !introComplete || !cashAnimationDone) {
     return (
       <div className="secure-payment-page">
         <Header />
+
         <main className="deposit-loading-content">
-          <div className="deposit-loader" />
-          <p>{translate("Loading deposit system...", "Deposit System লোড হচ্ছে...")}</p>
+          {loadingStage === "cash" ? (
+            <div className="cash-animation-wrap">
+              <svg
+                className="cash-based-svg"
+                viewBox="0 0 120 100"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-label="Cash payment"
+              >
+                <rect
+                  className="cash-note"
+                  x="12"
+                  y="25"
+                  width="96"
+                  height="58"
+                  rx="7"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                />
+
+                <path
+                  d="M22 25c0 8-3 12-10 12M98 25c0 8 3 12 10 12M22 83c0-8-3-12-10-12M98 83c0-8 3-12 10-12"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+
+                <circle
+                  className="cash-coin"
+                  cx="60"
+                  cy="54"
+                  r="19"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                />
+
+                <path
+                  d="M66 46c-2-4-11-5-13 0-3 7 12 5 12 12 0 6-9 8-15 3M60 40v28"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+
+                <path
+                  className="cash-spark"
+                  d="M60 7v8M43 12l4 6M77 12l-4 6"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          ) : (
+            <div className="deposit-verification-content">
+              <div className="deposit-loader" />
+
+              <p key={loadingStage} className="deposit-loading-text">
+                {loadingStage === "preparing" &&
+                  "preparing payment method"}
+
+                {loadingStage === "verifying" &&
+                  "Verify Payment Network"}
+
+                {loadingStage === "success" &&
+                  "Verification Successfully"}
+              </p>
+            </div>
+          )}
         </main>
+
         <Footer />
       </div>
     );
