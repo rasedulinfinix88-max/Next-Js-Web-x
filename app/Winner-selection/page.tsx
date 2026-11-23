@@ -235,18 +235,6 @@ export default function WinnerSelectionPage() {
                 r="2.5"
                 fill="#ffffff"
               />
-
-              <text
-                x="90"
-                y="145"
-                fill="#ffffff"
-                fontSize="11"
-                textAnchor="middle"
-                fontWeight="bold"
-                letterSpacing="1.5"
-              >
-                WINNER LOADING
-              </text>
             </svg>
           </div>
         </div>
@@ -292,11 +280,6 @@ export default function WinnerSelectionPage() {
 
               {activeTab === "jackpot" && (
                 <section className="history-content">
-                  <div className="section-heading jackpot-heading-title">
-                    <span>★ JACKPOT RESULTS</span>
-                    <h1>JACKPOT WINNING HISTORY</h1>
-                    <p>Official Published Jackpot Winners</p>
-                  </div>
 
                   {jackpotDraws.length === 0 ? (
                     <div className="message-box">
@@ -417,11 +400,6 @@ export default function WinnerSelectionPage() {
 
               {activeTab === "winner" && (
                 <section className="history-content">
-                  <div className="section-heading">
-                    <span>★ WINNER RESULTS</span>
-                    <h1>WINNER SELECTION HISTORY</h1>
-                    <p>Previous Draw Results</p>
-                  </div>
 
                   {draws.length === 0 ? (
                     <div className="message-box">
@@ -550,21 +528,22 @@ export default function WinnerSelectionPage() {
         }
 
         .loading-animation {
-          width: 63px;
-          height: 56px;
+          width: 180px;
+          height: 160px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .loading-svg {
-          width: 63px;
-          height: 56px;
+          width: 180px;
+          height: 160px;
           overflow: visible;
         }
 
         .loading-trophy {
-          transform-origin: 90px 70px;
+          transform-box: fill-box;
+          transform-origin: center;
           animation: trophy-pulse 1.3s ease-in-out infinite alternate;
         }
 
@@ -574,10 +553,10 @@ export default function WinnerSelectionPage() {
 
         @keyframes trophy-pulse {
           from {
-            transform: scale(0.96);
+            transform: scale(0.48);
           }
           to {
-            transform: scale(1.05);
+            transform: scale(0.52);
           }
         }
 
