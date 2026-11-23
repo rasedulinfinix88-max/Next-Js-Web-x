@@ -3,6 +3,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../../lib/supabase/client";
+import Header from "../../../../components/Header/Header";
+import Footer from "../../../../components/Footer/Footer";
 import "./page.css";
 
 type PaymentMethod = {
@@ -295,26 +297,22 @@ export default function DepositMethodPage() {
 
   if (loading) {
     return (
-      <div className="secure-payment-page deposit-loading">
-        <div className="deposit-loader" />
-        <p>Deposit System লোড হচ্ছে...</p>
+      <div className="secure-payment-page">
+        <Header />
+        <main className="deposit-loading-content">
+          <div className="deposit-loader" />
+          <p>Deposit System লোড হচ্ছে...</p>
+        </main>
+        <Footer />
       </div>
     );
   }
 
   return (
     <div className="secure-payment-page">
+      <Header />
+
       <main className="secure-main">
-        <div className="deposit-page-heading">
-          <h1>Deposit</h1>
-          <p>আপনার Account-এ Balance যোগ করুন</p>
-        </div>
-
-        <section className="balance-info-card">
-          <span>Available Balance</span>
-          <h2>{balance.toLocaleString("en-US")}</h2>
-        </section>
-
         {!depositEnabled && (
           <div className="msg-box error">
             {maintenanceMessage || "Deposit Service বর্তমানে বন্ধ আছে।"}
@@ -404,9 +402,28 @@ export default function DepositMethodPage() {
               </div>
             </section>
 
-            <form onSubmit={handleSubmit}>
-              <section className="deposit-section">
+            <form onSubmit={handleSubmit} className="deposit-form-card">
+              <section className="deposit-form-field">
                 <h3 className="sec-title">Deposit Amount</h3>
+
+                <p className="deposit-limit">
+                  Minimum: 100 <span>|</span> Maximum: 10000
+                </p>
+
+                <div className="quick-amount-grid">
+                  {[20, 100, 500, 1000, 5000].map((value) => (
+                    <button
+                      type="button"
+                      key={value}
+                      className={`quick-amount-btn ${
+                        amount === String(value) ? "active" : ""
+                      }`}
+                      onClick={() => setAmount(String(value))}
+                    >
+                      {value.toLocaleString("en-US")}
+                    </button>
+                  ))}
+                </div>
 
                 <input
                   className="custom-amount-input"
@@ -419,22 +436,9 @@ export default function DepositMethodPage() {
                   onChange={(event) => setAmount(event.target.value)}
                   required
                 />
-
-                {(selectedMethod.min_deposit !== null ||
-                  selectedMethod.max_deposit !== null) && (
-                  <p className="deposit-limit">
-                    {selectedMethod.min_deposit !== null &&
-                      `Minimum: ${selectedMethod.min_deposit}`}
-                    {selectedMethod.min_deposit !== null &&
-                      selectedMethod.max_deposit !== null &&
-                      " | "}
-                    {selectedMethod.max_deposit !== null &&
-                      `Maximum: ${selectedMethod.max_deposit}`}
-                  </p>
-                )}
               </section>
 
-              <section className="deposit-section">
+              <section className="deposit-form-field">
                 <h3 className="sec-title">Sender Account / Wallet</h3>
 
                 <input
@@ -446,7 +450,7 @@ export default function DepositMethodPage() {
                 />
               </section>
 
-              <section className="deposit-section">
+              <section className="deposit-form-field">
                 <h3 className="sec-title">Transaction ID</h3>
 
                 <input
@@ -495,6 +499,8 @@ export default function DepositMethodPage() {
           <div className={`msg-box ${messageType}`}>{message}</div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }
