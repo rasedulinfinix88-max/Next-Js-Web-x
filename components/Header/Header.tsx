@@ -80,6 +80,7 @@ export default function LotteryHeader({
   );
 
   const [hasUnread, setHasUnread] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
 
   // =========================================
   // Notification Check
@@ -143,7 +144,6 @@ export default function LotteryHeader({
 
     updateAuth();
 
-    // Auth State Listener
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -162,7 +162,6 @@ export default function LotteryHeader({
       }
     });
 
-    // Automatically check every 10 seconds
     const notificationInterval = setInterval(() => {
       if (currentUserId) {
         fetchNotifications(currentUserId);
@@ -180,10 +179,148 @@ export default function LotteryHeader({
     initialIsLoggedIn,
   ]);
 
+  // =========================================
+  // User Balance Fetch + Realtime
+  // =========================================
+
+  useEffect(() => {
+    let isMounted = true;
+    let currentUserId: string | null = null;
+    let balanceInterval: ReturnType<typeof setInterval> | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const fetchBalance = async (userId: string) => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("balance")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!isMounted || currentUserId !== userId) return;
+
+      if (error) {
+        console.error("Balance fetch error:", error.message);
+        return;
+      }
+
+      if (data) {
+        const newBalance = Number(data.balance);
+
+        if (Number.isFinite(newBalance)) {
+          setBalance(newBalance);
+        }
+      }
+    };
+
+    const setupBalance = async (userId: string) => {
+      if (currentUserId === userId && channel) return;
+
+      currentUserId = userId;
+      setBalance(null);
+
+      if (channel) {
+        await supabase.removeChannel(channel);
+        channel = null;
+      }
+
+      if (balanceInterval) {
+        clearInterval(balanceInterval);
+        balanceInterval = null;
+      }
+
+      await fetchBalance(userId);
+
+      if (!isMounted || currentUserId !== userId) return;
+
+      channel = supabase
+        .channel(`header-balance-${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${userId}`,
+          },
+          (payload) => {
+            const updatedBalance = Number(payload.new.balance);
+
+            if (Number.isFinite(updatedBalance)) {
+              setBalance(updatedBalance);
+            }
+          }
+        )
+        .subscribe();
+
+      balanceInterval = setInterval(() => {
+        if (currentUserId === userId) {
+          fetchBalance(userId);
+        }
+      }, 10000);
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const userId = session?.user?.id || null;
+
+      if (!userId) {
+        currentUserId = null;
+        setBalance(null);
+
+        if (channel) {
+          supabase.removeChannel(channel);
+          channel = null;
+        }
+
+        if (balanceInterval) {
+          clearInterval(balanceInterval);
+          balanceInterval = null;
+        }
+
+        return;
+      }
+
+      setupBalance(userId);
+    });
+
+    const initializeBalance = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!isMounted) return;
+
+      const userId = session?.user?.id || null;
+
+      if (userId) {
+        await setupBalance(userId);
+      } else {
+        setBalance(null);
+      }
+    };
+
+    initializeBalance();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+
+      if (balanceInterval) {
+        clearInterval(balanceInterval);
+      }
+
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, []);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setHasUnread(false);
+    setBalance(null);
     setIsMenuOpen(false);
     router.push("/Client/Login/");
   };
@@ -208,18 +345,37 @@ export default function LotteryHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {isLoggedIn ? (
-            <button
-              onClick={() => router.push("/Notification")}
-              className="relative p-1.5 rounded-full bg-black/20 hover:bg-black/40 transition border border-white/10"
-            >
-              <Icons.Bell />
+            <>
+              {/* User Balance */}
+              <div className="flex flex-col items-end justify-center bg-black/20 border border-white/10 rounded-lg px-2 py-1 min-w-0">
+                <span className="text-[9px] text-white/70 font-semibold leading-tight">
+                  {t("Balance", "ব্যালেন্স")}
+                </span>
 
-              {hasUnread && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-              )}
-            </button>
+                <span className="text-xs sm:text-sm text-white font-bold tabular-nums whitespace-nowrap leading-tight">
+                  {balance === null
+                    ? "..."
+                    : `৳ ${balance.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
+                </span>
+              </div>
+
+              {/* Notification */}
+              <button
+                onClick={() => router.push("/Notification")}
+                className="relative p-1.5 rounded-full bg-black/20 hover:bg-black/40 transition border border-white/10"
+              >
+                <Icons.Bell />
+
+                {hasUnread && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                )}
+              </button>
+            </>
           ) : (
             <div className="flex items-center gap-2">
               <Link
