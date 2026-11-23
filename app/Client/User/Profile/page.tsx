@@ -46,6 +46,52 @@ const labelStyle: React.CSSProperties = {
   marginBottom: "8px",
 };
 
+function ProfileIcon({ size = 34 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+    </svg>
+  );
+}
+
+function CheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12l4 4L19 6" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      aria-hidden="true"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -361,62 +407,22 @@ export default function ProfilePage() {
     router.push("/Support-center/");
   }
 
+  /* LOADING SCREEN */
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0b1713]">
-        <style>{`
-          @keyframes profilePulse {
-            0%,100% { transform:scale(1); opacity:.65; }
-            50% { transform:scale(1.12); opacity:1; }
-          }
-          @keyframes profileRing {
-            from { transform:rotate(0deg); }
-            to { transform:rotate(360deg); }
-          }
-          .profile-pulse { animation:profilePulse 1.4s ease-in-out infinite; }
-          .profile-ring { animation:profileRing 2s linear infinite; transform-origin:center; }
-          .premium-card {
-            background: linear-gradient(145deg, #172820 0%, #111d18 100%);
-            border: 1px solid #2b4035;
-            box-shadow: 0 12px 35px rgba(0,0,0,.16);
-          }
-          .premium-input:focus {
-            border-color: #52b788 !important;
-            box-shadow: 0 0 0 3px rgba(82,183,136,.10);
-          }
-          .premium-action {
-            transition: all .2s ease;
-          }
-          .premium-action:active {
-            transform: scale(.985);
-          }
-        `}</style>
-
-        <div className="relative w-24 h-24 flex items-center justify-center">
-          <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full profile-ring">
-            <circle cx="50" cy="50" r="43" fill="none" stroke="#315c43" strokeWidth="4" />
-            <path d="M50 7 A43 43 0 0 1 93 50" fill="none" stroke="#52b788" strokeWidth="4" strokeLinecap="round" />
-          </svg>
-
-          <svg viewBox="0 0 48 48" className="w-12 h-12 profile-pulse" fill="none" stroke="#b8f5ce" strokeWidth="2">
-            <circle cx="24" cy="15" r="8" />
-            <path d="M8 42c0-9 7-15 16-15s16 6 16 15" strokeLinecap="round" />
-            <path d="M35 8l3 3 5-5" stroke="#52b788" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0d241e]">
+        <div className="w-24 h-24 rounded-full border border-[#47745a] bg-[#183b2b] flex items-center justify-center shadow-xl">
+          <ProfileIcon size={43} />
         </div>
-
         <p className="text-white text-xs font-bold tracking-[3px] mt-5">
           LOADING PROFILE
-        </p>
-        <p className="text-[#8ca797] text-[11px] mt-2">
-          Preparing your account...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1713] text-white pb-24">
+    <div className="min-h-screen bg-[#0d241e] text-white pb-24">
       <style>{`
         .premium-card {
           background: linear-gradient(145deg, #172820 0%, #111d18 100%);
@@ -429,6 +435,7 @@ export default function ProfilePage() {
         }
         .premium-action {
           transition: all .2s ease;
+          color: #ffffff !important;
         }
         .premium-action:active {
           transform: scale(.985);
@@ -441,38 +448,21 @@ export default function ProfilePage() {
       <LotteryHeader userProfile={profile} />
 
       <main className="max-w-2xl mx-auto px-3 sm:px-5 py-5 space-y-5">
-        {/* PAGE INTRO */}
-        <div className="flex items-center justify-between gap-3 px-1">
-          <div>
-            <p className="text-[10px] font-bold tracking-[2.5px] text-[#65b88d] uppercase">
-              Account Management
-            </p>
-            <h1 className="text-2xl font-extrabold tracking-tight mt-1">
-              My Profile
-            </h1>
-            <p className="text-xs text-[#879b8e] mt-1">
-              Manage your personal information and account security
-            </p>
-          </div>
-
-          <div className="w-11 h-11 rounded-2xl bg-[#193729] border border-[#315b43] flex items-center justify-center shrink-0">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#82d9a8" strokeWidth="1.7">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
-            </svg>
-          </div>
-        </div>
-
         {pageError && (
           <div className="rounded-2xl border border-red-800/70 bg-red-950/40 p-4 text-sm text-red-200">
             <div className="flex items-start gap-3">
-              <span className="text-lg">!</span>
+              <span className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M12 8v5M12 17h.01" />
+                  <circle cx="12" cy="12" r="9" />
+                </svg>
+              </span>
               <div className="flex-1">
                 <p className="font-bold">Unable to load profile</p>
                 <p className="mt-1 text-xs leading-5">{pageError}</p>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-3 text-xs font-bold underline underline-offset-4"
+                  className="premium-action mt-3 text-xs font-bold underline underline-offset-4"
                 >
                   Try Again
                 </button>
@@ -492,10 +482,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <div className="flex items-center gap-4">
                   <div className="w-[68px] h-[68px] rounded-2xl bg-gradient-to-br from-[#3d8058] to-[#1c5136] border border-[#8bd5a6]/40 flex items-center justify-center shadow-lg shrink-0">
-                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#eafff0" strokeWidth="1.5">
-                      <circle cx="12" cy="8" r="4" />
-                      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
-                    </svg>
+                    <ProfileIcon size={36} />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -566,14 +553,21 @@ export default function ProfilePage() {
             {/* FEEDBACK */}
             {message && (
               <div className="rounded-2xl border border-emerald-700/60 bg-emerald-950/40 p-4 text-sm text-emerald-200 flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">✓</span>
+                <span className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <CheckIcon size={15} />
+                </span>
                 {message}
               </div>
             )}
 
             {error && (
               <div className="rounded-2xl border border-red-700/60 bg-red-950/40 p-4 text-sm text-red-200 flex items-start gap-3">
-                <span className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">!</span>
+                <span className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 8v5M12 17h.01" />
+                    <circle cx="12" cy="12" r="9" />
+                  </svg>
+                </span>
                 <span className="break-words">{error}</span>
               </div>
             )}
@@ -601,7 +595,7 @@ export default function ProfilePage() {
                       setMessage("");
                       setEditing(true);
                     }}
-                    className="premium-action rounded-xl border border-[#4b9667]/50 bg-[#244b35] px-3 py-2.5 text-[10px] font-extrabold tracking-wide text-[#b8edc8]"
+                    className="premium-action rounded-xl border border-[#4b9667]/50 bg-[#244b35] px-3 py-2.5 text-[10px] font-extrabold tracking-wide"
                   >
                     EDIT PROFILE
                   </button>
@@ -637,10 +631,10 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                      <button type="submit" disabled={saving} className="premium-action flex-1 rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] font-extrabold py-3.5 text-xs tracking-wide shadow-lg shadow-emerald-950/30 disabled:opacity-50">
+                      <button type="submit" disabled={saving} className="premium-action flex-1 rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] font-extrabold py-3.5 text-xs tracking-wide shadow-lg shadow-emerald-950/30 disabled:opacity-50">
                         {saving ? "SAVING..." : "SAVE CHANGES"}
                       </button>
-                      <button type="button" onClick={() => { fillForm(profile); setEditing(false); }} className="premium-action rounded-xl border border-[#405347] bg-[#25372d] px-6 py-3.5 text-xs font-bold text-[#c6d4ca]">
+                      <button type="button" onClick={() => { fillForm(profile); setEditing(false); }} className="premium-action rounded-xl border border-[#405347] bg-[#25372d] px-6 py-3.5 text-xs font-bold">
                         CANCEL
                       </button>
                     </div>
@@ -700,9 +694,7 @@ export default function ProfilePage() {
                   <div key={String(label)} className="flex items-center justify-between gap-3 rounded-xl border border-[#304538] bg-[#14231a] px-4 py-3.5">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-[#203c2c] flex items-center justify-center shrink-0">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9bcaaa" strokeWidth="1.8">
-                          <path d="M5 12l4 4L19 6" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <CheckIcon size={16} />
                       </div>
                       <span className="text-xs font-semibold text-[#c8d7cd]">{label}</span>
                     </div>
@@ -757,8 +749,8 @@ export default function ProfilePage() {
                       <p className="text-[10px] text-[#849b8c] mt-1">Update your login password</p>
                     </div>
                   </div>
-                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-[#a9d9b8] text-lg">
-                    {passwordOpen ? "−" : "+"}
+                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-white">
+                    <ChevronIcon open={passwordOpen} />
                   </span>
                 </button>
 
@@ -776,11 +768,11 @@ export default function ProfilePage() {
                       <label style={labelStyle}>Confirm New Password</label>
                       <input className="premium-input" style={inputStyle} type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
                     </div>
-                    <button disabled={passwordBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
+                    <button disabled={passwordBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
                       {passwordBusy ? "UPDATING..." : "UPDATE PASSWORD"}
                     </button>
                     <div className="text-right">
-                      <button type="button" onClick={support} className="text-xs font-semibold text-[#8ed5a7] underline underline-offset-4">
+                      <button type="button" onClick={support} className="premium-action text-xs font-semibold underline underline-offset-4">
                         Forgot password? Support
                       </button>
                     </div>
@@ -809,8 +801,8 @@ export default function ProfilePage() {
                       <p className="text-[10px] text-[#849b8c] mt-1">Manage your 4-digit security PIN</p>
                     </div>
                   </div>
-                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-[#a9d9b8] text-lg">
-                    {pinOpen ? "−" : "+"}
+                  <span className="w-7 h-7 rounded-lg bg-[#294536] flex items-center justify-center text-white">
+                    <ChevronIcon open={pinOpen} />
                   </span>
                 </button>
 
@@ -828,11 +820,11 @@ export default function ProfilePage() {
                       <label style={labelStyle}>Confirm New PIN</label>
                       <input className="premium-input" style={inputStyle} type="password" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))} required />
                     </div>
-                    <button disabled={pinBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] text-[#071a10] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
+                    <button disabled={pinBusy} className="premium-action w-full rounded-xl bg-gradient-to-r from-[#65c58b] to-[#48a875] py-3.5 text-xs font-extrabold tracking-wide disabled:opacity-50">
                       {pinBusy ? "UPDATING..." : "UPDATE SECRET PIN"}
                     </button>
                     <div className="text-right">
-                      <button type="button" onClick={support} className="text-xs font-semibold text-[#8ed5a7] underline underline-offset-4">
+                      <button type="button" onClick={support} className="premium-action text-xs font-semibold underline underline-offset-4">
                         Forgot PIN? Support
                       </button>
                     </div>
@@ -879,7 +871,7 @@ export default function ProfilePage() {
             </section>
 
             <div className="text-center pt-1 pb-2">
-              <p className="text-[10px] text-[#657c6d] tracking-wide">
+              <p className="text-[10px] text-[#9bb0a2] tracking-wide">
                 Your account information is protected
               </p>
             </div>
