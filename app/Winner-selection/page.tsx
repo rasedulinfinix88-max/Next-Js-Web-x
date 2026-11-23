@@ -176,27 +176,6 @@ export default function WinnerSelectionPage() {
               role="img"
               aria-label="Loading winner results"
             >
-              <circle
-                cx="90"
-                cy="70"
-                r="43"
-                fill="none"
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth="5"
-              />
-
-              <circle
-                className="loading-ring"
-                cx="90"
-                cy="70"
-                r="43"
-                fill="none"
-                stroke="#ffffff"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeDasharray="72 198"
-              />
-
               <g className="loading-trophy">
                 <path
                   d="M66 39 H114 V57 C114 76 104 88 90 88 C76 88 66 76 66 57 Z"
@@ -270,10 +249,6 @@ export default function WinnerSelectionPage() {
               </text>
             </svg>
           </div>
-
-          <p className="loading-message">
-            Preparing Winner Results...
-          </p>
         </div>
       ) : (
         <div className="winner-container">
@@ -550,7 +525,7 @@ export default function WinnerSelectionPage() {
       <style jsx>{`
         .winner-page {
           min-height: 100vh;
-          background: #101512;
+          background: #0d241e;
           color: #ffffff;
           padding-bottom: 85px;
           font-family: Arial, sans-serif;
@@ -571,25 +546,21 @@ export default function WinnerSelectionPage() {
           align-items: center;
           justify-content: center;
           padding: 25px;
+          background: #0d241e;
         }
 
         .loading-animation {
-          width: 180px;
-          height: 160px;
+          width: 63px;
+          height: 56px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
         .loading-svg {
-          width: 180px;
-          height: 160px;
+          width: 63px;
+          height: 56px;
           overflow: visible;
-        }
-
-        .loading-ring {
-          transform-origin: 90px 70px;
-          animation: rotate-ring 1.1s linear infinite;
         }
 
         .loading-trophy {
@@ -599,21 +570,6 @@ export default function WinnerSelectionPage() {
 
         .loading-star {
           animation: star-pulse 1s ease-in-out infinite alternate;
-        }
-
-        .loading-message {
-          margin-top: 17px;
-          color: #ffffff;
-          font-size: 12px;
-          letter-spacing: 0.8px;
-          font-weight: 700;
-          text-align: center;
-        }
-
-        @keyframes rotate-ring {
-          to {
-            transform: rotate(360deg);
-          }
         }
 
         @keyframes trophy-pulse {
