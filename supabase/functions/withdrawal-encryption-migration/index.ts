@@ -9,13 +9,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-migration-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const supabaseUrl = Deno.env.get("PROJECT_URL") ?? "";
 const serviceRoleKey = Deno.env.get("PROJECT_SERVICE_KEY") ?? "";
 const encryptionSecret = Deno.env.get("WITHDRAWAL_ENCRYPTION_KEY") ?? "";
+const migrationRunKey = Deno.env.get("WITHDRAWAL_MIGRATION_RUN_KEY") ?? "";
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
@@ -48,10 +49,19 @@ function response(data: any, status = 200) {
   });
 }
 
-function getBearerToken(req: Request) {
-  const header = req.headers.get("Authorization") ?? "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
-  return match?.[1] ?? "";
+function constantTimeEqual(a: string, b: string) {
+  const left = encoder.encode(a);
+  const right = encoder.encode(b);
+
+  let difference = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+
+  for (let i = 0; i < length; i++) {
+    difference |=
+      (left[i] ?? 0) ^ (right[i] ?? 0);
+  }
+
+  return difference === 0;
 }
 
 function toBase64(bytes: Uint8Array) {
@@ -82,7 +92,7 @@ async function getEncryptionKey() {
 
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    encoder.encode(encryptionSecret)
+    encoder.encode(encryptionSecret),
   );
 
   return await crypto.subtle.importKey(
@@ -90,7 +100,7 @@ async function getEncryptionKey() {
     digest,
     { name: "AES-GCM" },
     false,
-    ["encrypt", "decrypt"]
+    ["encrypt", "decrypt"],
   );
 }
 
@@ -102,11 +112,11 @@ async function encryptJson(value: any) {
   const encrypted = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
-    plaintext
+    plaintext,
   );
 
   return `v1.${toBase64(iv)}.${toBase64(
-    new Uint8Array(encrypted)
+    new Uint8Array(encrypted),
   )}`;
 }
 
@@ -128,7 +138,7 @@ async function decryptJson(value: string) {
   const decrypted = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv },
     key,
-    ciphertext
+    ciphertext,
   );
 
   return JSON.parse(decoder.decode(decrypted));
@@ -167,43 +177,6 @@ function getAccountData(row: any) {
   return result;
 }
 
-async function authenticateSuperAdmin(req: Request) {
-  const token = getBearerToken(req);
-
-  if (!token) {
-    throw new Error("Authentication required");
-  }
-
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-
-  if (error || !data.user) {
-    throw new Error("Invalid or expired session");
-  }
-
-  const { data: profile, error: profileError } =
-    await supabaseAdmin
-      .from("profiles")
-      .select("id, user_role, account_status")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-  if (profileError) throw profileError;
-
-  if (!profile) {
-    throw new Error("User profile not found");
-  }
-
-  if (profile.account_status !== "active") {
-    throw new Error("Account is not active");
-  }
-
-  if (profile.user_role !== "super_admin") {
-    throw new Error("Super Admin access required");
-  }
-
-  return profile;
-}
-
 // =========================================
 // MIGRATE OLD WITHDRAWAL ACCOUNTS
 // =========================================
@@ -212,7 +185,7 @@ async function migrateAccounts() {
   const { data: accounts, error } = await supabaseAdmin
     .from("withdrawal_accounts")
     .select(
-      "id, account_holder_name, account_number, bank_name, branch_name, routing_number, account_type, wallet_address, network, encrypted_account_data"
+      "id, account_holder_name, account_number, bank_name, branch_name, routing_number, account_type, wallet_address, network, encrypted_account_data",
     );
 
   if (error) throw error;
@@ -226,8 +199,7 @@ async function migrateAccounts() {
       continue;
     }
 
-    const accountData = getAccountData(account);
-    const encrypted = await encryptJson(accountData);
+    const encrypted = await encryptJson(getAccountData(account));
 
     const { data: updated, error: updateError } =
       await supabaseAdmin
@@ -284,9 +256,7 @@ async function migrateSnapshots() {
       typeof snapshotData !== "object" ||
       Array.isArray(snapshotData)
     ) {
-      throw new Error(
-        `Invalid legacy snapshot data: ${snapshot.id}`
-      );
+      throw new Error("Invalid legacy snapshot data");
     }
 
     const encrypted = await encryptJson(snapshotData);
@@ -326,7 +296,7 @@ async function verifyAccounts() {
   const { data: accounts, error } = await supabaseAdmin
     .from("withdrawal_accounts")
     .select(
-      "id, account_holder_name, account_number, bank_name, branch_name, routing_number, account_type, wallet_address, network, encrypted_account_data"
+      "id, account_holder_name, account_number, bank_name, branch_name, routing_number, account_type, wallet_address, network, encrypted_account_data",
     );
 
   if (error) throw error;
@@ -341,12 +311,10 @@ async function verifyAccounts() {
       }
 
       const decrypted = await decryptJson(
-        account.encrypted_account_data
+        account.encrypted_account_data,
       );
 
-      const original = getAccountData(account);
-
-      if (!sameJson(decrypted, original)) {
+      if (!sameJson(decrypted, getAccountData(account))) {
         throw new Error("Decrypted data does not match");
       }
 
@@ -385,7 +353,7 @@ async function verifySnapshots() {
       }
 
       const decrypted = await decryptJson(
-        snapshot.encrypted_account_snapshot
+        snapshot.encrypted_account_snapshot,
       );
 
       if (!sameJson(decrypted, snapshot.account_snapshot)) {
@@ -423,18 +391,30 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceRoleKey) {
       return response(
         { error: "Supabase environment configuration is missing" },
-        500
+        500,
       );
     }
 
     if (!encryptionSecret || encryptionSecret.length < 32) {
       return response(
         { error: "Encryption secret is missing or invalid" },
-        500
+        500,
       );
     }
 
-    await authenticateSuperAdmin(req);
+    if (!migrationRunKey || migrationRunKey.length < 32) {
+      return response(
+        { error: "Migration authorization secret is missing or invalid" },
+        500,
+      );
+    }
+
+    const suppliedKey =
+      req.headers.get("x-migration-key") ?? "";
+
+    if (!constantTimeEqual(suppliedKey, migrationRunKey)) {
+      return response({ error: "Unauthorized" }, 401);
+    }
 
     const body = await req.json();
     const action = String(body.action ?? "").trim();
@@ -449,7 +429,7 @@ serve(async (req) => {
         accounts: accountResult,
         snapshots: snapshotResult,
         plaintext_preserved: true,
-        next_step: "Run verify_legacy before making any database changes",
+        next_step: "Run verify_legacy before database changes",
       });
     }
 
@@ -478,7 +458,7 @@ serve(async (req) => {
   } catch (error) {
     return response(
       { error: error.message ?? "Internal server error" },
-      400
+      400,
     );
   }
 });
