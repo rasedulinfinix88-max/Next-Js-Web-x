@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
@@ -52,7 +53,6 @@ function unwrapResponse(response: any): any {
 }
 
 // ---------- SIMULATED SOLD / LIVE VIEWERS ----------
-// Deterministic hash so same day+draw shows same value on refresh
 function seededRandom01(seed: string): number {
   let hash = 2166136261;
   for (let i = 0; i < seed.length; i++) {
@@ -62,7 +62,6 @@ function seededRandom01(seed: string): number {
   return ((hash >>> 0) % 1000000) / 1000000;
 }
 
-// Cycle: starts at 00:30, ends at next day 00:30 (per requirement)
 function getCycleDate(now: Date): string {
   const d = new Date(now);
   if (d.getHours() === 0 && d.getMinutes() < 30) {
@@ -79,17 +78,14 @@ function getCycleStart(cycleDate: string): Date {
   return new Date(y, m - 1, d, 0, 30, 0, 0);
 }
 
-// Sold-out time: different slot per draw (so tickets never overlap),
-// different minute per day (so it changes every day)
 function getSoldOutTime(drawId: string, cycleDate: string): Date {
   const [y, m, d] = cycleDate.split("-").map(Number);
 
-  // slot is FIXED per draw_id  -> different draws get different windows
   const slotSeed = seededRandom01(drawId + "|slot");
   const slot = Math.floor(slotSeed * 3);
 
-  const slotStarts = [15 * 60, 18 * 60, 21 * 60]; // 3 PM / 6 PM / 9 PM
-  const slotEnds = [18 * 60, 21 * 60, 23 * 60 + 30]; // 6 PM / 9 PM / 11:30 PM
+  const slotStarts = [15 * 60, 18 * 60, 21 * 60];
+  const slotEnds = [18 * 60, 21 * 60, 23 * 60 + 30];
 
   const range = slotEnds[slot] - slotStarts[slot];
   const dayRandom = seededRandom01(drawId + "|" + cycleDate);
@@ -101,7 +97,6 @@ function getSoldOutTime(drawId: string, cycleDate: string): Date {
   return target;
 }
 
-// Linear growth from 0 -> 1000, then stays at 1000 until 00:30 reset
 function getSimulatedSold(drawId: string, now: Date): number {
   if (!drawId) return 0;
   const cycleDate = getCycleDate(now);
@@ -117,13 +112,12 @@ function getSimulatedSold(drawId: string, now: Date): number {
   return Math.min(1000, Math.floor(progress * 1000));
 }
 
-// Per-draw base number + small variation every few seconds
 function getLiveViewers(drawId: string, now: Date): number {
   if (!drawId) return 0;
   const baseSeed = seededRandom01(drawId + "|live-base");
-  const base = 80 + Math.floor(baseSeed * 220); // 80 - 300
+  const base = 80 + Math.floor(baseSeed * 220);
 
-  const bucket = Math.floor(now.getTime() / 8000); // changes every 8s
+  const bucket = Math.floor(now.getTime() / 8000);
   const variation =
     Math.floor(seededRandom01(drawId + "|live-" + bucket) * 40) - 20;
 
@@ -184,14 +178,11 @@ function TicketBuyContent() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState("");
 
-  // Simulated Sold / Live Viewers
   const [displayedSold, setDisplayedSold] = useState(0);
   const [liveViewers, setLiveViewers] = useState(0);
 
-  // একই Purchase-এর Retry হলে একই Request ID ব্যবহার হবে।
   const pendingRequestId = useRef<string | null>(null);
 
-  // নতুন QR তৈরি করার আলাদা Function
   const generateTicketQr = async (ticketId: string) => {
     if (!ticketId || qrLoading) return;
 
@@ -222,7 +213,6 @@ function TicketBuyContent() {
         );
       }
 
-      // GitHub Pages Base Path
       const verificationUrl = new URL(
         "/Next-Js-Web-x/verify-ticket/",
         window.location.origin
@@ -320,7 +310,6 @@ function TicketBuyContent() {
         }
 
         const drawResponseData = unwrapResponse(drawResponse);
-
         const drawData = drawResponseData?.draw || drawResponseData;
 
         if (!drawData || !drawData.draw_id) {
@@ -363,8 +352,6 @@ function TicketBuyContent() {
     };
   }, [drawId, router, t]);
 
-  // Simulated Sold + Live Viewers: refreshes every 5 seconds,
-  // resets automatically at 00:30 (new cycle date).
   useEffect(() => {
     const id = draw?.draw_id;
     if (!id) return;
@@ -506,8 +493,6 @@ function TicketBuyContent() {
         )
       );
 
-      // QR তৈরি আলাদা কাজ।
-      // QR ব্যর্থ হলেও Purchase সফল থাকবে।
       if (purchasedTicket.id) {
         void generateTicketQr(purchasedTicket.id);
       } else {
@@ -543,21 +528,60 @@ function TicketBuyContent() {
       }
     : undefined;
 
+  // Loading Screen — centered white SVG ticket icon
   if (loading) {
     return (
-      <div className="ticket-buy-page">
+      <div
+        className="ticket-buy-page"
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          boxSizing: "border-box",
+        }}
+      >
         <div
-          className="ticket-buy-main"
           style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
             textAlign: "center",
-            paddingTop: 80,
+            gap: "16px",
           }}
         >
-          <div className="ticket-loader" style={{ fontSize: 42 }}>
-            🎟️
-          </div>
+          <svg
+            className="ticket-loader"
+            xmlns="http://www.w3.org/2000/svg"
+            width="52"
+            height="52"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-label="Loading"
+            role="img"
+          >
+            <path d="M3 8a2 2 0 0 0 0 4v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4a2 2 0 0 1 0-4V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z" />
+            <path d="M13 4v2" />
+            <path d="M13 10v2" />
+            <path d="M13 16v2" />
+          </svg>
 
-          <p>
+          <p
+            style={{
+              color: "#FFFFFF",
+              fontSize: "13px",
+              fontWeight: 700,
+              letterSpacing: "1.5px",
+              margin: 0,
+            }}
+          >
             {t(
               "Loading Ticket Information...",
               "Ticket Information লোড হচ্ছে..."
@@ -855,7 +879,19 @@ export default function TicketBuyPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ padding: 30, textAlign: "center" }}>Loading...</div>
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#0d241e",
+            color: "#ffffff",
+            textAlign: "center",
+          }}
+        >
+          Loading...
+        </div>
       }
     >
       <TicketBuyContent />
