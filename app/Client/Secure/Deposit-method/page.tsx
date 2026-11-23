@@ -171,11 +171,13 @@ export default function DepositMethodPage() {
     (!selectedMethod?.max_deposit ||
       amountNumber <= Number(selectedMethod.max_deposit));
 
+  const transactionIdValid = transactionId.trim().length >= 6;
+
   const canSubmit =
     depositEnabled &&
     paymentDetailsReady &&
     amountValid &&
-    transactionId.trim().length >= 3 &&
+    transactionIdValid &&
     !submitting &&
     !loading;
 
@@ -211,8 +213,8 @@ export default function DepositMethodPage() {
       return;
     }
 
-    if (transactionId.trim().length < 3) {
-      showMessage("সঠিক Transaction ID লিখুন।", "error");
+    if (!transactionIdValid) {
+      showMessage("Transaction ID কমপক্ষে ৬ অক্ষর বা সংখ্যা হতে হবে।", "error");
       return;
     }
 
@@ -407,7 +409,7 @@ export default function DepositMethodPage() {
                 <h3 className="sec-title">Deposit Amount</h3>
 
                 <p className="deposit-limit">
-                  Minimum: 100 <span>|</span> Maximum: 10000
+                  Minimum: 20 <span>|</span> Maximum: 10000
                 </p>
 
                 <div className="quick-amount-grid">
@@ -459,11 +461,20 @@ export default function DepositMethodPage() {
                   placeholder="Enter Transaction ID"
                   value={transactionId}
                   onChange={(event) =>
-                    setTransactionId(event.target.value.toUpperCase())
+                    setTransactionId(
+                      event.target.value
+                        .replace(/[\u0980-\u09FF]/g, "")
+                        .toUpperCase()
+                    )
                   }
                   required
-                  minLength={3}
+                  minLength={6}
+                  autoComplete="off"
                 />
+
+                <p className="transaction-hint">
+                  Minimum 6 characters or numbers
+                </p>
               </section>
 
               {message && (
@@ -479,8 +490,6 @@ export default function DepositMethodPage() {
                   <p>আপনার Request এখন Pending অবস্থায় আছে।</p>
                 </div>
               )}
-
-              <div className="deposit-submit-space" />
 
               <div className="submit-btn-wrapper">
                 <button
