@@ -350,9 +350,7 @@ export default function LotteryHeader({
             <>
               {/* User Balance */}
               <div className="flex flex-col items-end justify-center bg-black/20 border border-white/10 rounded-lg px-2 py-1 min-w-0">
-                <span className="text-[9px] text-white/70 font-semibold leading-tight">
-                  {t("Balance", "ব্যালেন্স")}
-                </span>
+               
 
                 <span className="text-xs sm:text-sm text-white font-bold tabular-nums whitespace-nowrap leading-tight">
                   {balance === null
